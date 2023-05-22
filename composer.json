@@ -17,9 +17,9 @@
     "require": {
         "composer/installers": "^1.9",
         "cweagans/composer-patches": "^1.7",
-        "drupal/core": "9.5.x-dev",
-        "drupal/core-composer-scaffold": "9.5.x-dev",
-        "drupal/core-recommended": "9.5.x-dev",
+        "drupal/core": "^10.0",
+        "drupal/core-composer-scaffold": "^10.0",
+        "drupal/core-recommended": "^10.0",
         "drupal/flysystem": "2.1.x-dev",
         "drush/drush": "^11.0",
         "league/flysystem-memory": "^1.0",
@@ -27,7 +27,7 @@
         "wikimedia/composer-merge-plugin": "^2.0"
     },
     "require-dev": {
-        "drupal/core-dev": "9.5.x-dev",
+        "drupal/core-dev": "^10.0",
         "phpspec/prophecy-phpunit": "^2",
         "phpstan/phpstan-deprecation-rules": "^1.0"
     },
@@ -43,13 +43,13 @@
             "php": "8.1 as 7.0"
         },
         "allow-plugins": {
-            "cweagans/composer-patches": true,
             "drupal/core-composer-scaffold": true,
             "composer/installers": true,
             "wikimedia/composer-merge-plugin": true,
             "oomphinc/composer-installers-extender": true,
             "phpstan/extension-installer": true,
-            "dealerdirect/phpcodesniffer-composer-installer": true
+            "dealerdirect/phpcodesniffer-composer-installer": true,
+            "cweagans/composer-patches": true
         }
     },
     "extra": {
@@ -114,6 +114,8 @@
             "drupal/core": "-p2"
         },
         "patches": {
+          "flysystem": {
+          }
         }
     },
     "scripts": {
