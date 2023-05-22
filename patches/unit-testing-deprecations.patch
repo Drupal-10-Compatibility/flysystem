@@ -1,0 +1,258 @@
+diff --git a/tests/src/Functional/ModuleInstallUninstallWebTest.php b/tests/src/Functional/ModuleInstallUninstallWebTest.php
+index 0d3a488..8cb2d41 100644
+--- a/tests/src/Functional/ModuleInstallUninstallWebTest.php
++++ b/tests/src/Functional/ModuleInstallUninstallWebTest.php
+@@ -19,7 +19,7 @@ class ModuleInstallUninstallWebTest extends BrowserTestBase {
+   /**
+    * {@inheritdoc}
+    */
+-  public static $modules = ['flysystem'];
++  protected static $modules = ['flysystem'];
+ 
+   /**
+    * Tests installation and uninstallation.
+diff --git a/tests/src/Kernel/CollectionOptimizerTest.php b/tests/src/Kernel/CollectionOptimizerTest.php
+index a6dd6fc..daa2edb 100644
+--- a/tests/src/Kernel/CollectionOptimizerTest.php
++++ b/tests/src/Kernel/CollectionOptimizerTest.php
+@@ -23,15 +23,28 @@ class CollectionOptimizerTest extends KernelTestBase {
+   /**
+    * {@inheritdoc}
+    */
+-  public function setUp() {
++  protected static $modules = ['file'];
++
++  /**
++   * The file URL generator.
++   *
++   * @var \Drupal\Core\File\FileUrlGeneratorInterface
++   */
++  protected $fileUrlGenerator;
++
++  /**
++   * {@inheritdoc}
++   */
++  public function setUp(): void {
+     parent::setUp();
++    $this->fileUrlGenerator = $this->container->get('file_url_generator');
+     $this->cleanUp();
+   }
+ 
+   /**
+    * {@inheritdoc}
+    */
+-  public function tearDown() {
++  public function tearDown(): void {
+     $this->cleanUp();
+     parent::tearDown();
+   }
+@@ -68,7 +81,7 @@ class CollectionOptimizerTest extends KernelTestBase {
+ 
+     foreach ($this->jsFilesUnderTest() as $js_file => $expired) {
+       if ($expired === TRUE) {
+-        $this->assertFileNotExists($js_file);
++        $this->assertFileDoesNotExist($js_file);
+         continue;
+       }
+       $this->assertFileExists($js_file);
+@@ -103,12 +116,12 @@ class CollectionOptimizerTest extends KernelTestBase {
+     $dumper = $this->prophesize(AssetDumper::class);
+     $state = $this->prophesize(StateInterface::class);
+ 
+-    $optimizer = new CssCollectionOptimizer($grouper->reveal(), new CssOptimizer(), $dumper->reveal(), $state->reveal(), $this->container->get('file_system'));
++    $optimizer = new CssCollectionOptimizer($grouper->reveal(), new CssOptimizer($this->fileUrlGenerator), $dumper->reveal(), $state->reveal(), $this->container->get('file_system'));
+     $optimizer->deleteAll();
+ 
+     foreach ($this->cssFilesUnderTest() as $css_file => $expired) {
+       if ($expired === TRUE) {
+-        $this->assertFileNotExists($css_file);
++        $this->assertFileDoesNotExist($css_file);
+         continue;
+       }
+       $this->assertFileExists($css_file);
+diff --git a/tests/src/Unit/Flysystem/Adapter/CacheItemBackendTest.php b/tests/src/Unit/Flysystem/Adapter/CacheItemBackendTest.php
+index 10bc303..f00b104 100644
+--- a/tests/src/Unit/Flysystem/Adapter/CacheItemBackendTest.php
++++ b/tests/src/Unit/Flysystem/Adapter/CacheItemBackendTest.php
+@@ -34,7 +34,7 @@ class CacheItemBackendTest extends UnitTestCase {
+   /**
+    * {@inheritdoc}
+    */
+-  public function setup() {
++  public function setup(): void {
+     $this->cacheBackend = new MemoryBackend('foo');
+     $this->cacheItemBackend = new CacheItemBackend('test-scheme', $this->cacheBackend);
+   }
+diff --git a/tests/src/Unit/Flysystem/Adapter/DrupalCacheAdapterTest.php b/tests/src/Unit/Flysystem/Adapter/DrupalCacheAdapterTest.php
+index 9ec5380..e851c37 100644
+--- a/tests/src/Unit/Flysystem/Adapter/DrupalCacheAdapterTest.php
++++ b/tests/src/Unit/Flysystem/Adapter/DrupalCacheAdapterTest.php
+@@ -57,7 +57,7 @@ class DrupalCacheAdapterTest extends UnitTestCase {
+   /**
+    * {@inheritdoc}
+    */
+-  public function setup() {
++  public function setup(): void {
+     $this->cacheItemBackend = new CacheItemBackend(static::SCHEME, new MemoryBackend('foo'));
+     $this->adapter = $this->prophesize(AdapterInterface::class);
+     $this->cacheAdapter = new DrupalCacheAdapter(static::SCHEME, $this->adapter->reveal(), $this->cacheItemBackend);
+diff --git a/tests/src/Unit/Flysystem/FtpTest.php b/tests/src/Unit/Flysystem/FtpTest.php
+index 0e657a7..2f28bf7 100644
+--- a/tests/src/Unit/Flysystem/FtpTest.php
++++ b/tests/src/Unit/Flysystem/FtpTest.php
+@@ -17,7 +17,7 @@ namespace Drupal\Tests\flysystem\Unit\Flysystem {
+     /**
+      * {@inheritdoc}
+      */
+-    public function setUp() {
++    public function setUp(): void {
+       parent::setUp();
+       if (!defined('FTP_BINARY')) {
+         $this->markTestSkipped('The FTP_BINARY constant is not defined.');
+diff --git a/tests/src/Unit/Flysystem/LocalTest.php b/tests/src/Unit/Flysystem/LocalTest.php
+index b5b28f9..9147834 100644
+--- a/tests/src/Unit/Flysystem/LocalTest.php
++++ b/tests/src/Unit/Flysystem/LocalTest.php
+@@ -21,7 +21,7 @@ class LocalTest extends UnitTestCase {
+   /**
+    * {@inheritdoc}
+    */
+-  public function setUp() {
++  public function setUp(): void {
+     parent::setUp();
+     $GLOBALS['base_url'] = 'http://example.com';
+ 
+@@ -42,7 +42,7 @@ class LocalTest extends UnitTestCase {
+   /**
+    * {@inheritdoc}
+    */
+-  public function tearDown() {
++  public function tearDown(): void {
+     (new LocalAdapter('foo'))->deleteDir('');
+     @rmdir('foo');
+ 
+@@ -103,6 +103,7 @@ class LocalTest extends UnitTestCase {
+    * @covers ::ensureDirectory
+    */
+   public function testDirectoryIsAutoCreatedAndHtaccessIsWritten() {
++    new Local('does_not_exist');
+     $this->assertTrue(is_dir('does_not_exist'));
+     $this->assertTrue(is_file('does_not_exist/.htaccess'));
+ 
+diff --git a/tests/src/Unit/FlysystemBridgeTest.php b/tests/src/Unit/FlysystemBridgeTest.php
+index d5d3199..2fe42e1 100644
+--- a/tests/src/Unit/FlysystemBridgeTest.php
++++ b/tests/src/Unit/FlysystemBridgeTest.php
+@@ -34,7 +34,7 @@ class FlysystemBridgeTest extends UnitTestCase {
+   /**
+    * {@inheritdoc}
+    */
+-  public function setUp() {
++  public function setUp(): void {
+     parent::setUp();
+     $this->bridge = new FlysystemBridge();
+     $this->bridge->setStringTranslation($this->getStringTranslationStub());
+diff --git a/tests/src/Unit/FlysystemFactoryTest.php b/tests/src/Unit/FlysystemFactoryTest.php
+index 16af913..9c9e0b1 100644
+--- a/tests/src/Unit/FlysystemFactoryTest.php
++++ b/tests/src/Unit/FlysystemFactoryTest.php
+@@ -62,7 +62,7 @@ class FlysystemFactoryTest extends UnitTestCase {
+   /**
+    * {@inheritdoc}
+    */
+-  public function setUp() {
++  public function setUp(): void {
+     parent::setUp();
+ 
+     $this->cache = new NullBackend('bin');
+diff --git a/tests/src/Unit/FlysystemServiceProviderTest.php b/tests/src/Unit/FlysystemServiceProviderTest.php
+index 8028125..745e198 100644
+--- a/tests/src/Unit/FlysystemServiceProviderTest.php
++++ b/tests/src/Unit/FlysystemServiceProviderTest.php
+@@ -33,7 +33,7 @@ class FlysystemServiceProviderTest extends UnitTestCase {
+   /**
+    * {@inheritdoc}
+    */
+-  public function setUp() {
++  public function setUp(): void {
+     $this->container = new ContainerBuilder();
+   }
+ 
+diff --git a/tests/src/Unit/Form/ConfigFormTest.php b/tests/src/Unit/Form/ConfigFormTest.php
+index 45958fb..058b711 100644
+--- a/tests/src/Unit/Form/ConfigFormTest.php
++++ b/tests/src/Unit/Form/ConfigFormTest.php
+@@ -39,7 +39,7 @@ namespace Drupal\Tests\flysystem\Unit\Form {
+     /**
+      * {@inheritdoc}
+      */
+-    public function setUp() {
++    public function setUp(): void {
+       parent::setUp();
+ 
+       $this->factory = $this->prophesize(FlysystemFactory::class);
+diff --git a/tests/src/Unit/InstallFunctionsTest.php b/tests/src/Unit/InstallFunctionsTest.php
+index 7e046bc..fdfa0d3 100644
+--- a/tests/src/Unit/InstallFunctionsTest.php
++++ b/tests/src/Unit/InstallFunctionsTest.php
+@@ -26,7 +26,7 @@ class InstallFunctionsTest extends UnitTestCase {
+   /**
+    * {@inheritdoc}
+    */
+-  public function setUp() {
++  public function setUp(): void {
+     parent::setUp();
+ 
+     if (!defined('REQUIREMENT_ERROR')) {
+diff --git a/tests/src/Unit/Logger/ConvertTest.php b/tests/src/Unit/Logger/ConvertTest.php
+index 9dbd346..8198eb3 100644
+--- a/tests/src/Unit/Logger/ConvertTest.php
++++ b/tests/src/Unit/Logger/ConvertTest.php
+@@ -15,7 +15,7 @@ class ConvertTest extends UnitTestCase {
+   /**
+    * {@inheritdoc}
+    */
+-  public function setUp() {
++  public function setUp(): void {
+     $consts = [
+       'REQUIREMENT_INFO' => -1,
+       'REQUIREMENT_OK' => 0,
+diff --git a/tests/src/Unit/ModuleFunctionsTest.php b/tests/src/Unit/ModuleFunctionsTest.php
+index a7d7869..e90dbdb 100644
+--- a/tests/src/Unit/ModuleFunctionsTest.php
++++ b/tests/src/Unit/ModuleFunctionsTest.php
+@@ -27,7 +27,7 @@ class ModuleFunctionsTest extends UnitTestCase {
+   /**
+    * {@inheritdoc}
+    */
+-  public function setUp() {
++  public function setUp(): void {
+     parent::setUp();
+     vfsStream::setup('module_file');
+ 
+diff --git a/tests/src/Unit/PathProcessor/LocalPathProcessorTest.php b/tests/src/Unit/PathProcessor/LocalPathProcessorTest.php
+index d000369..49aff43 100644
+--- a/tests/src/Unit/PathProcessor/LocalPathProcessorTest.php
++++ b/tests/src/Unit/PathProcessor/LocalPathProcessorTest.php
+@@ -23,7 +23,7 @@ class LocalPathProcessorTest extends UnitTestCase {
+   /**
+    * {@inheritdoc}
+    */
+-  public function setUp() {
++  public function setUp(): void {
+     new Settings(
+       [
+         'flysystem' => [
+diff --git a/tests/src/Unit/Routing/FlysystemRoutesTest.php b/tests/src/Unit/Routing/FlysystemRoutesTest.php
+index 111960e..816402b 100644
+--- a/tests/src/Unit/Routing/FlysystemRoutesTest.php
++++ b/tests/src/Unit/Routing/FlysystemRoutesTest.php
+@@ -41,7 +41,7 @@ class FlysystemRoutesTest extends UnitTestCase {
+   /**
+    * {@inheritdoc}
+    */
+-  public function setUp() {
++  public function setUp(): void {
+     $container = new ContainerBuilder();
+ 
+     $stream_wrapper = $this->prophesize(LocalStream::class);
