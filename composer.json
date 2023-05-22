@@ -20,7 +20,7 @@
         "drupal/core": "9.5.x-dev",
         "drupal/core-composer-scaffold": "9.5.x-dev",
         "drupal/core-recommended": "9.5.x-dev",
-        "drupal/flysystem": "2.0.x-dev",
+        "drupal/flysystem": "2.1.x-dev",
         "drush/drush": "^11.0",
         "league/flysystem-memory": "^1.0",
         "oomphinc/composer-installers-extender": "^2.0",
@@ -114,9 +114,6 @@
             "drupal/core": "-p2"
         },
         "patches": {
-          "drupal/flysystem": {
-            "Drupal Coding Standards and deprecations": "patches/coding-standards-and-deprecations.patch"
-          }
         }
     },
     "scripts": {
