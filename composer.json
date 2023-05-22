@@ -114,6 +114,9 @@
             "drupal/core": "-p2"
         },
         "patches": {
+          "drupal/flysystem": {
+            "Drupal Coding Standards": "patches/coding-standards.patch"
+          }
         }
     },
     "scripts": {
