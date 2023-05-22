@@ -115,8 +115,7 @@
         },
         "patches": {
           "drupal/flysystem": {
-            "Drupal Coding Standards": "patches/coding-standards.patch",
-            "Unit testing deprecations": "patches/unit-testing-deprecations.patch"
+            "Drupal Coding Standards and deprecations": "patches/coding-standards-and-deprecations.patch"
           }
         }
     },
