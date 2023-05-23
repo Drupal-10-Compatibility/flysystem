@@ -28,7 +28,6 @@
     },
     "require-dev": {
         "drupal/core-dev": "^10.0",
-        "phpspec/prophecy-phpunit": "^2",
         "phpstan/phpstan-deprecation-rules": "^1.0"
     },
     "conflict": {
@@ -115,6 +114,7 @@
         },
         "patches": {
           "flysystem": {
+            "Correct typo in EventSubscriberInterface class declaration": "patches/correct-typo-in-eventsubscriber-class.patch"
           }
         }
     },
