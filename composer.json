@@ -114,7 +114,8 @@
         },
         "patches": {
             "drupal/flysystem": {
-                "3371573": "patches/3371573-rerolled-patch.patch"
+                "3371573": "patches/3371573-rerolled-patch.patch",
+                "Coding Standards patch": "patches/coding-standards.patch"
             }
         }
     },

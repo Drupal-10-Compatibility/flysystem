@@ -1,0 +1,427 @@
+diff --git a/src/Asset/AssetDumper.php b/src/Asset/AssetDumper.php
+index 6bf6f76..2327ba6 100644
+--- a/src/Asset/AssetDumper.php
++++ b/src/Asset/AssetDumper.php
+@@ -2,9 +2,9 @@
+ 
+ namespace Drupal\flysystem\Asset;
+ 
+-use Drupal\Core\File\FileSystemInterface;
+ use Drupal\Component\Utility\Crypt;
+ use Drupal\Core\Asset\AssetDumper as DrupalAssetDumper;
++use Drupal\Core\File\FileSystemInterface;
+ 
+ /**
+  * Flysystem dependency injection container.
+diff --git a/src/Asset/CssOptimizer.php b/src/Asset/CssOptimizer.php
+index 5830254..d3d7629 100644
+--- a/src/Asset/CssOptimizer.php
++++ b/src/Asset/CssOptimizer.php
+@@ -31,7 +31,6 @@ class CssOptimizer extends DrupalCssOptimizer {
+   /**
+    * {@inheritdoc}
+    */
+-
+   public function rewriteFileURI($matches): string {
+     // Prefix with base and remove '../' segments where possible.
+     $path = $this->rewriteFileURIBasePath . $matches[1];
+diff --git a/src/EventSubscriber/EnsureSubscriber.php b/src/EventSubscriber/EnsureSubscriber.php
+index d3ffec1..e397d29 100644
+--- a/src/EventSubscriber/EnsureSubscriber.php
++++ b/src/EventSubscriber/EnsureSubscriber.php
+@@ -6,8 +6,8 @@ use Drupal\Core\Logger\RfcLogLevel;
+ use Drupal\flysystem\Event\EnsureEvent;
+ use Drupal\flysystem\Event\FlysystemEvents;
+ use Psr\Log\LoggerInterface;
+-use Symfony\Contracts\EventDispatcher\EventDispatcherInterface;
+ use Symfony\Component\EventDispatcher\EventSubscriberInterface;
++use Symfony\Contracts\EventDispatcher\EventDispatcherInterface;
+ 
+ /**
+  * Event listener that listens to Flysystem ensure() calls.
+diff --git a/tests/src/Kernel/CollectionOptimizerTest.php b/tests/src/Kernel/CollectionOptimizerTest.php
+index daa2edb..9fb14f7 100644
+--- a/tests/src/Kernel/CollectionOptimizerTest.php
++++ b/tests/src/Kernel/CollectionOptimizerTest.php
+@@ -6,10 +6,10 @@ use Drupal\Core\Asset\AssetCollectionGrouperInterface;
+ use Drupal\Core\Asset\CssOptimizer;
+ use Drupal\Core\Asset\JsOptimizer;
+ use Drupal\Core\State\StateInterface;
+-use Drupal\KernelTests\KernelTestBase;
+ use Drupal\flysystem\Asset\AssetDumper;
+ use Drupal\flysystem\Asset\CssCollectionOptimizer;
+ use Drupal\flysystem\Asset\JsCollectionOptimizer;
++use Drupal\KernelTests\KernelTestBase;
+ use org\bovigo\vfs\vfsStream;
+ 
+ /**
+diff --git a/tests/src/Unit/Asset/SchemeExtensionTraitTest.php b/tests/src/Unit/Asset/SchemeExtensionTraitTest.php
+index d5730e3..a9a01a9 100644
+--- a/tests/src/Unit/Asset/SchemeExtensionTraitTest.php
++++ b/tests/src/Unit/Asset/SchemeExtensionTraitTest.php
+@@ -3,8 +3,8 @@
+ namespace Drupal\Tests\flysystem\Unit\Asset;
+ 
+ use Drupal\Core\Site\Settings;
+-use Drupal\Tests\UnitTestCase;
+ use Drupal\flysystem\Asset\SchemeExtensionTrait;
++use Drupal\Tests\UnitTestCase;
+ 
+ /**
+  * @coversDefaultClass \Drupal\flysystem\Asset\SchemeExtensionTrait
+diff --git a/tests/src/Unit/Event/EnsureEventTest.php b/tests/src/Unit/Event/EnsureEventTest.php
+index 4d7530e..8960845 100644
+--- a/tests/src/Unit/Event/EnsureEventTest.php
++++ b/tests/src/Unit/Event/EnsureEventTest.php
+@@ -2,8 +2,8 @@
+ 
+ namespace Drupal\Tests\flysystem\Unit\Event;
+ 
+-use Drupal\Tests\UnitTestCase;
+ use Drupal\flysystem\Event\EnsureEvent;
++use Drupal\Tests\UnitTestCase;
+ 
+ /**
+  * Tests EnsureEvent.
+diff --git a/tests/src/Unit/EventSubscriber/EnsureSubscriberTest.php b/tests/src/Unit/EventSubscriber/EnsureSubscriberTest.php
+index f0695ca..2b2effd 100644
+--- a/tests/src/Unit/EventSubscriber/EnsureSubscriberTest.php
++++ b/tests/src/Unit/EventSubscriber/EnsureSubscriberTest.php
+@@ -2,10 +2,10 @@
+ 
+ namespace Drupal\Tests\flysystem\Unit\EventSubscriber;
+ 
+-use Drupal\Tests\UnitTestCase;
+-use Drupal\flysystem\EventSubscriber\EnsureSubscriber;
+ use Drupal\flysystem\Event\EnsureEvent;
+ use Drupal\flysystem\Event\FlysystemEvents;
++use Drupal\flysystem\EventSubscriber\EnsureSubscriber;
++use Drupal\Tests\UnitTestCase;
+ use Psr\Log\LoggerInterface;
+ use Symfony\Contracts\EventDispatcher\EventDispatcherInterface;
+ 
+diff --git a/tests/src/Unit/Flysystem/Adapter/CacheItemBackendTest.php b/tests/src/Unit/Flysystem/Adapter/CacheItemBackendTest.php
+index f00b104..8c56a70 100644
+--- a/tests/src/Unit/Flysystem/Adapter/CacheItemBackendTest.php
++++ b/tests/src/Unit/Flysystem/Adapter/CacheItemBackendTest.php
+@@ -3,9 +3,9 @@
+ namespace Drupal\Tests\flysystem\Unit\Flysystem\Adapter;
+ 
+ use Drupal\Core\Cache\MemoryBackend;
+-use Drupal\Tests\UnitTestCase;
+ use Drupal\flysystem\Flysystem\Adapter\CacheItem;
+ use Drupal\flysystem\Flysystem\Adapter\CacheItemBackend;
++use Drupal\Tests\UnitTestCase;
+ 
+ /**
+  * Tests \Drupal\flysystem\Flysystem\Adapter\CacheItemBackend.
+diff --git a/tests/src/Unit/Flysystem/Adapter/DrupalCacheAdapterTest.php b/tests/src/Unit/Flysystem/Adapter/DrupalCacheAdapterTest.php
+index e851c37..8f796ac 100644
+--- a/tests/src/Unit/Flysystem/Adapter/DrupalCacheAdapterTest.php
++++ b/tests/src/Unit/Flysystem/Adapter/DrupalCacheAdapterTest.php
+@@ -3,9 +3,9 @@
+ namespace Drupal\Tests\flysystem\Unit\Flysystem\Adapter;
+ 
+ use Drupal\Core\Cache\MemoryBackend;
+-use Drupal\Tests\UnitTestCase;
+ use Drupal\flysystem\Flysystem\Adapter\CacheItemBackend;
+ use Drupal\flysystem\Flysystem\Adapter\DrupalCacheAdapter;
++use Drupal\Tests\UnitTestCase;
+ use League\Flysystem\AdapterInterface;
+ use League\Flysystem\Config;
+ 
+diff --git a/tests/src/Unit/Flysystem/Adapter/MissingAdapterTest.php b/tests/src/Unit/Flysystem/Adapter/MissingAdapterTest.php
+index 4501241..7bae52f 100644
+--- a/tests/src/Unit/Flysystem/Adapter/MissingAdapterTest.php
++++ b/tests/src/Unit/Flysystem/Adapter/MissingAdapterTest.php
+@@ -2,8 +2,8 @@
+ 
+ namespace Drupal\Tests\flysystem\Unit\Flysystem\Adapter;
+ 
+-use Drupal\Tests\UnitTestCase;
+ use Drupal\flysystem\Flysystem\Adapter\MissingAdapter;
++use Drupal\Tests\UnitTestCase;
+ use League\Flysystem\Config;
+ 
+ /**
+diff --git a/tests/src/Unit/Flysystem/FtpTest.php b/tests/src/Unit/Flysystem/FtpTest.php
+index 2f28bf7..b4771d7 100644
+--- a/tests/src/Unit/Flysystem/FtpTest.php
++++ b/tests/src/Unit/Flysystem/FtpTest.php
+@@ -3,9 +3,9 @@
+ namespace Drupal\Tests\flysystem\Unit\Flysystem {
+ 
+   use Drupal\Core\Logger\RfcLogLevel;
+-  use Drupal\Tests\UnitTestCase;
+   use Drupal\flysystem\Flysystem\Adapter\MissingAdapter;
+   use Drupal\flysystem\Flysystem\Ftp;
++  use Drupal\Tests\UnitTestCase;
+   use League\Flysystem\Adapter\Ftp as LeagueFtp;
+ 
+   /**
+diff --git a/tests/src/Unit/Flysystem/LocalTest.php b/tests/src/Unit/Flysystem/LocalTest.php
+index 9147834..9ef5be6 100644
+--- a/tests/src/Unit/Flysystem/LocalTest.php
++++ b/tests/src/Unit/Flysystem/LocalTest.php
+@@ -6,9 +6,9 @@ use Drupal\Core\DependencyInjection\ContainerBuilder;
+ use Drupal\Core\Logger\RfcLogLevel;
+ use Drupal\Core\Routing\UrlGeneratorInterface;
+ use Drupal\Core\Site\Settings;
+-use Drupal\Tests\UnitTestCase;
+ use Drupal\flysystem\Flysystem\Adapter\MissingAdapter;
+ use Drupal\flysystem\Flysystem\Local;
++use Drupal\Tests\UnitTestCase;
+ use League\Flysystem\Adapter\Local as LocalAdapter;
+ use Prophecy\Argument;
+ 
+diff --git a/tests/src/Unit/Flysystem/MissingTest.php b/tests/src/Unit/Flysystem/MissingTest.php
+index 3472f01..66c4c4f 100644
+--- a/tests/src/Unit/Flysystem/MissingTest.php
++++ b/tests/src/Unit/Flysystem/MissingTest.php
+@@ -2,9 +2,9 @@
+ 
+ namespace Drupal\Tests\flysystem\Unit\Flysystem;
+ 
+-use Drupal\Tests\UnitTestCase;
+ use Drupal\flysystem\Flysystem\Adapter\MissingAdapter;
+ use Drupal\flysystem\Flysystem\Missing;
++use Drupal\Tests\UnitTestCase;
+ 
+ /**
+  * @coversDefaultClass \Drupal\flysystem\Flysystem\Missing
+diff --git a/tests/src/Unit/FlysystemBridgeTest.php b/tests/src/Unit/FlysystemBridgeTest.php
+index 2fe42e1..7f50bd6 100644
+--- a/tests/src/Unit/FlysystemBridgeTest.php
++++ b/tests/src/Unit/FlysystemBridgeTest.php
+@@ -3,11 +3,11 @@
+ namespace Drupal\Tests\flysystem\Unit;
+ 
+ use Drupal\Core\StreamWrapper\StreamWrapperInterface;
+-use Drupal\Tests\UnitTestCase;
+-use Drupal\flysystem\FlysystemBridge;
+-use Drupal\flysystem\FlysystemFactory;
+ use Drupal\flysystem\Flysystem\Adapter\MissingAdapter;
+ use Drupal\flysystem\Flysystem\Missing;
++use Drupal\flysystem\FlysystemBridge;
++use Drupal\flysystem\FlysystemFactory;
++use Drupal\Tests\UnitTestCase;
+ use League\Flysystem\Filesystem;
+ use Symfony\Component\DependencyInjection\ContainerBuilder;
+ 
+diff --git a/tests/src/Unit/FlysystemFactoryTest.php b/tests/src/Unit/FlysystemFactoryTest.php
+index d9d8287..5f1d73a 100644
+--- a/tests/src/Unit/FlysystemFactoryTest.php
++++ b/tests/src/Unit/FlysystemFactoryTest.php
+@@ -6,12 +6,12 @@ use Drupal\Component\Plugin\PluginManagerInterface;
+ use Drupal\Core\Cache\NullBackend;
+ use Drupal\Core\Site\Settings;
+ use Drupal\Core\StreamWrapper\StreamWrapperManager;
+-use Drupal\Tests\UnitTestCase;
+-use Drupal\flysystem\FlysystemFactory;
+ use Drupal\flysystem\Flysystem\Adapter\DrupalCacheAdapter;
+ use Drupal\flysystem\Flysystem\Adapter\MissingAdapter;
+ use Drupal\flysystem\Flysystem\Missing;
++use Drupal\flysystem\FlysystemFactory;
+ use Drupal\flysystem\Plugin\FlysystemPluginInterface;
++use Drupal\Tests\UnitTestCase;
+ use League\Flysystem\Adapter\NullAdapter;
+ use League\Flysystem\FilesystemInterface;
+ use League\Flysystem\Replicate\ReplicateAdapter;
+diff --git a/tests/src/Unit/FlysystemServiceProviderTest.php b/tests/src/Unit/FlysystemServiceProviderTest.php
+index 745e198..0bb8bb8 100644
+--- a/tests/src/Unit/FlysystemServiceProviderTest.php
++++ b/tests/src/Unit/FlysystemServiceProviderTest.php
+@@ -8,7 +8,6 @@ use Drupal\Core\Asset\CssOptimizer;
+ use Drupal\Core\Asset\JsCollectionOptimizer;
+ use Drupal\Core\DependencyInjection\ContainerBuilder;
+ use Drupal\Core\Site\Settings;
+-use Drupal\Tests\UnitTestCase;
+ use Drupal\flysystem\Asset\AssetDumper as FlysystemAssetDumper;
+ use Drupal\flysystem\Asset\CssCollectionOptimizer as FlysystemCssCollectionOptimizer;
+ use Drupal\flysystem\Asset\CssOptimizer as FlysystemCssOptimizer;
+@@ -16,6 +15,7 @@ use Drupal\flysystem\Asset\JsCollectionOptimizer as FlysystemJsCollectionOptimiz
+ use Drupal\flysystem\FlysystemBridge;
+ use Drupal\flysystem\FlysystemServiceProvider;
+ use Drupal\flysystem\PathProcessor\LocalPathProcessor;
++use Drupal\Tests\UnitTestCase;
+ 
+ /**
+  * @coversDefaultClass \Drupal\flysystem\FlysystemServiceProvider
+diff --git a/tests/src/Unit/Form/ConfigFormTest.php b/tests/src/Unit/Form/ConfigFormTest.php
+index 058b711..4390155 100644
+--- a/tests/src/Unit/Form/ConfigFormTest.php
++++ b/tests/src/Unit/Form/ConfigFormTest.php
+@@ -2,19 +2,19 @@
+ 
+ namespace Drupal\Tests\flysystem\Unit\Form {
+ 
+-  use function Drupal\flysystem\Form\batch_set;
+   use Drupal\Core\Form\FormState;
+   use Drupal\Core\Logger\LoggerChannelFactoryInterface;
+   use Drupal\Core\Messenger\MessengerInterface;
+-  use Drupal\Tests\UnitTestCase;
+   use Drupal\flysystem\FlysystemFactory;
+   use Drupal\flysystem\Form\ConfigForm;
++  use Drupal\Tests\UnitTestCase;
+   use League\Flysystem\Filesystem;
+   use League\Flysystem\FilesystemInterface;
+   use League\Flysystem\Memory\MemoryAdapter;
+   use Prophecy\Argument;
+   use Psr\Log\LoggerInterface;
+   use Symfony\Component\DependencyInjection\ContainerBuilder;
++  use function Drupal\flysystem\Form\batch_set;
+ 
+   /**
+    * @coversDefaultClass \Drupal\flysystem\Form\ConfigForm
+diff --git a/tests/src/Unit/InstallFunctionsTest.php b/tests/src/Unit/InstallFunctionsTest.php
+index fdfa0d3..220a3fc 100644
+--- a/tests/src/Unit/InstallFunctionsTest.php
++++ b/tests/src/Unit/InstallFunctionsTest.php
+@@ -4,8 +4,8 @@ namespace Drupal\Tests\flysystem\Unit;
+ 
+ use Drupal\Core\Logger\RfcLogLevel;
+ use Drupal\Core\Site\Settings;
+-use Drupal\Tests\UnitTestCase;
+ use Drupal\flysystem\FlysystemFactory;
++use Drupal\Tests\UnitTestCase;
+ use Symfony\Component\DependencyInjection\ContainerBuilder;
+ use Twistor\FlysystemStreamWrapper;
+ 
+diff --git a/tests/src/Unit/Logger/ConvertTest.php b/tests/src/Unit/Logger/ConvertTest.php
+index 8198eb3..e185cc0 100644
+--- a/tests/src/Unit/Logger/ConvertTest.php
++++ b/tests/src/Unit/Logger/ConvertTest.php
+@@ -3,8 +3,8 @@
+ namespace Drupal\Tests\flysystem\Unit\Logger;
+ 
+ use Drupal\Core\Logger\RfcLogLevel;
+-use Drupal\Tests\UnitTestCase;
+ use Drupal\flysystem\Logger\Convert;
++use Drupal\Tests\UnitTestCase;
+ 
+ /**
+  * @coversDefaultClass \Drupal\flysystem\Logger\Convert
+diff --git a/tests/src/Unit/ModuleFunctionsTest.php b/tests/src/Unit/ModuleFunctionsTest.php
+index bbb341e..ce9e235 100644
+--- a/tests/src/Unit/ModuleFunctionsTest.php
++++ b/tests/src/Unit/ModuleFunctionsTest.php
+@@ -2,13 +2,13 @@
+ 
+ namespace Drupal\Tests\flysystem\Unit;
+ 
++use Drupal\Core\File\MimeType\ExtensionMimeTypeGuesser;
+ use Drupal\Core\StreamWrapper\StreamWrapperManagerInterface;
+-use Drupal\Tests\UnitTestCase;
+ use Drupal\flysystem\FlysystemFactory;
++use Drupal\Tests\UnitTestCase;
++use org\bovigo\vfs\vfsStream;
+ use Prophecy\Argument;
+ use Symfony\Component\DependencyInjection\ContainerBuilder;
+-use Drupal\Core\File\MimeType\ExtensionMimeTypeGuesser;
+-use org\bovigo\vfs\vfsStream;
+ 
+ /**
+  * Tests module functions.
+diff --git a/tests/src/Unit/PathProcessor/FlysystemPathProcessorTest.php b/tests/src/Unit/PathProcessor/FlysystemPathProcessorTest.php
+index 36727ab..6786151 100644
+--- a/tests/src/Unit/PathProcessor/FlysystemPathProcessorTest.php
++++ b/tests/src/Unit/PathProcessor/FlysystemPathProcessorTest.php
+@@ -2,8 +2,8 @@
+ 
+ namespace Drupal\Tests\flysystem\Unit\PathProcessor;
+ 
+-use Drupal\Tests\UnitTestCase;
+ use Drupal\flysystem\PathProcessor\FlysystemPathProcessor;
++use Drupal\Tests\UnitTestCase;
+ use Symfony\Component\HttpFoundation\Request;
+ 
+ /**
+diff --git a/tests/src/Unit/PathProcessor/LocalPathProcessorTest.php b/tests/src/Unit/PathProcessor/LocalPathProcessorTest.php
+index 49aff43..3d9aab3 100644
+--- a/tests/src/Unit/PathProcessor/LocalPathProcessorTest.php
++++ b/tests/src/Unit/PathProcessor/LocalPathProcessorTest.php
+@@ -3,8 +3,8 @@
+ namespace Drupal\Tests\flysystem\Unit\PathProcessor;
+ 
+ use Drupal\Core\Site\Settings;
+-use Drupal\Tests\UnitTestCase;
+ use Drupal\flysystem\PathProcessor\LocalPathProcessor;
++use Drupal\Tests\UnitTestCase;
+ use Symfony\Component\HttpFoundation\Request;
+ 
+ /**
+diff --git a/tests/src/Unit/Plugin/FlysystemPluginManagerTest.php b/tests/src/Unit/Plugin/FlysystemPluginManagerTest.php
+index 15b549f..24f074b 100644
+--- a/tests/src/Unit/Plugin/FlysystemPluginManagerTest.php
++++ b/tests/src/Unit/Plugin/FlysystemPluginManagerTest.php
+@@ -4,8 +4,8 @@ namespace Drupal\Tests\flysystem\Unit\Plugin;
+ 
+ use Drupal\Core\Cache\MemoryBackend;
+ use Drupal\Core\Extension\ModuleHandlerInterface;
+-use Drupal\Tests\UnitTestCase;
+ use Drupal\flysystem\Plugin\FlysystemPluginManager;
++use Drupal\Tests\UnitTestCase;
+ 
+ /**
+  * @coversDefaultClass \Drupal\flysystem\Plugin\FlysystemPluginManager
+diff --git a/tests/src/Unit/Plugin/FlysystemUrlTraitTest.php b/tests/src/Unit/Plugin/FlysystemUrlTraitTest.php
+index 15c2b66..1155d85 100644
+--- a/tests/src/Unit/Plugin/FlysystemUrlTraitTest.php
++++ b/tests/src/Unit/Plugin/FlysystemUrlTraitTest.php
+@@ -4,8 +4,8 @@ namespace Drupal\Tests\flysystem\Unit\Plugin;
+ 
+ use Drupal\Core\DependencyInjection\ContainerBuilder;
+ use Drupal\Core\Routing\UrlGenerator;
+-use Drupal\Tests\UnitTestCase;
+ use Drupal\flysystem\Plugin\FlysystemUrlTrait;
++use Drupal\Tests\UnitTestCase;
+ 
+ /**
+  * @coversDefaultClass \Drupal\flysystem\Plugin\FlysystemUrlTrait
+diff --git a/tests/src/Unit/Plugin/ImageStyleGenerationTraitTest.php b/tests/src/Unit/Plugin/ImageStyleGenerationTraitTest.php
+index 20b4623..dbe15db 100644
+--- a/tests/src/Unit/Plugin/ImageStyleGenerationTraitTest.php
++++ b/tests/src/Unit/Plugin/ImageStyleGenerationTraitTest.php
+@@ -8,11 +8,11 @@ use Drupal\Core\Entity\EntityTypeManagerInterface;
+ use Drupal\Core\Entity\EntityTypeRepositoryInterface;
+ use Drupal\Core\Lock\LockBackendInterface;
+ use Drupal\Core\Lock\NullLockBackend;
+-use Drupal\Tests\UnitTestCase;
+ use Drupal\flysystem\Plugin\ImageStyleGenerationTrait;
+ use Drupal\image\Entity\ImageStyle;
+-use Prophecy\Argument;
++use Drupal\Tests\UnitTestCase;
+ use org\bovigo\vfs\vfsStream;
++use Prophecy\Argument;
+ 
+ /**
+  * @coversDefaultClass \Drupal\flysystem\Plugin\ImageStyleGenerationTrait
+diff --git a/tests/src/Unit/Routing/FlysystemRoutesTest.php b/tests/src/Unit/Routing/FlysystemRoutesTest.php
+index 816402b..145e094 100644
+--- a/tests/src/Unit/Routing/FlysystemRoutesTest.php
++++ b/tests/src/Unit/Routing/FlysystemRoutesTest.php
+@@ -7,9 +7,9 @@ use Drupal\Core\Extension\ModuleHandlerInterface;
+ use Drupal\Core\Site\Settings;
+ use Drupal\Core\StreamWrapper\LocalStream;
+ use Drupal\Core\StreamWrapper\StreamWrapperManagerInterface;
+-use Drupal\Tests\UnitTestCase;
+ use Drupal\flysystem\FlysystemFactory;
+ use Drupal\flysystem\Routing\FlysystemRoutes;
++use Drupal\Tests\UnitTestCase;
+ 
+ /**
+  * @coversDefaultClass \Drupal\flysystem\Routing\FlysystemRoutes
+diff --git a/tests/src/Unit/SerializationStopperTraitTest.php b/tests/src/Unit/SerializationStopperTraitTest.php
+index b4ddb00..71a242a 100644
+--- a/tests/src/Unit/SerializationStopperTraitTest.php
++++ b/tests/src/Unit/SerializationStopperTraitTest.php
+@@ -2,8 +2,8 @@
+ 
+ namespace Drupal\Tests\flysystem\Unit;
+ 
+-use Drupal\Tests\UnitTestCase;
+ use Drupal\flysystem\SerializationStopperTrait;
++use Drupal\Tests\UnitTestCase;
+ 
+ /**
+  * @coversDefaultClass \Drupal\flysystem\SerializationStopperTrait
