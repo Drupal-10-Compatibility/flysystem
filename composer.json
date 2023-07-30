@@ -114,6 +114,7 @@
         },
         "patches": {
             "drupal/flysystem": {
+                "Partial unit test fixes":"patches/unit-test-partial-fixes.patch"
             }
         }
     },

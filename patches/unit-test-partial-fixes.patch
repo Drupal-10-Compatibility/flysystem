@@ -1,0 +1,339 @@
+diff --git a/src/Asset/AssetDumper.php b/src/Asset/AssetDumper.php
+index 2327ba6..8cb8294 100644
+--- a/src/Asset/AssetDumper.php
++++ b/src/Asset/AssetDumper.php
+@@ -26,8 +26,8 @@ class AssetDumper extends DrupalAssetDumper {
+     $path = $this->getSchemeForExtension($file_extension) . '://' . $file_extension;
+     $uri = $path . '/' . $filename;
+     // Create the CSS or JS file.
+-    \Drupal::service('file_system')->prepareDirectory($path, FileSystemInterface::CREATE_DIRECTORY);
+-    if (!file_exists($uri) && !\Drupal::service('file_system')->saveData($data, $uri, FileSystemInterface::EXISTS_REPLACE)) {
++    $this->fileSystem->prepareDirectory($path, FileSystemInterface::CREATE_DIRECTORY);
++    if (!file_exists($uri) && !$this->fileSystem->saveData($data, $uri, FileSystemInterface::EXISTS_REPLACE)) {
+       return FALSE;
+     }
+     // If CSS/JS gzip compression is enabled and the zlib extension is available
+@@ -39,7 +39,7 @@ class AssetDumper extends DrupalAssetDumper {
+     // aren't working can set css.gzip to FALSE in order to skip
+     // generating a file that won't be used.
+     if (extension_loaded('zlib') && \Drupal::config('system.performance')->get($file_extension . '.gzip')) {
+-      if (!file_exists($uri . '.gz') && !\Drupal::service('file_system')->saveData(gzencode($data, 9, FORCE_GZIP), $uri . '.gz', FileSystemInterface::EXISTS_REPLACE)) {
++      if (!file_exists($uri . '.gz') && !$this->fileSystem->saveData(gzencode($data, 9, FORCE_GZIP), $uri . '.gz', FileSystemInterface::EXISTS_REPLACE)) {
+         return FALSE;
+       }
+     }
+diff --git a/src/Asset/CssCollectionOptimizer.php b/src/Asset/CssCollectionOptimizer.php
+index c1d2f26..0f2296a 100644
+--- a/src/Asset/CssCollectionOptimizer.php
++++ b/src/Asset/CssCollectionOptimizer.php
+@@ -19,7 +19,7 @@ class CssCollectionOptimizer extends DrupalCssCollectionOptimizer {
+   public function deleteAll() {
+     $this->state->delete('drupal_css_cache_files');
+     /** @var \Drupal\Core\File\FileSystem $file_system */
+-    $file_system = \Drupal::service('file_system');
++    $file_system = $this->fileSystem;
+     $delete_stale = static function ($uri) use ($file_system) {
+       // Default stale file threshold is 30 days (2592000 seconds).
+       $stale_file_threshold = \Drupal::config('system.performance')->get('stale_file_threshold') ?? 2592000;
+diff --git a/src/Asset/CssOptimizer.php b/src/Asset/CssOptimizer.php
+index d3d7629..6ff4dec 100644
+--- a/src/Asset/CssOptimizer.php
++++ b/src/Asset/CssOptimizer.php
+@@ -10,23 +10,6 @@ use Drupal\Core\Asset\CssOptimizer as DrupalCssOptimizer;
+  * @codeCoverageIgnore
+  */
+ class CssOptimizer extends DrupalCssOptimizer {
+-  /**
+-   * The FileUrl Generator Service.
+-   *
+-   * @var \Drupal\Core\File\FileUrlGeneratorInterface
+-   */
+-  protected $fileUrlGenerator;
+-
+-  /**
+-   * Constructs a new CssOptimizer object.
+-   *
+-   * @param \Drupal\Core\File\FileUrlGeneratorInterface $fileUrlGenerator
+-   *   The FileUrl Generator service.
+-   */
+-  public function __construct(FileUrlGeneratorInterface $fileUrlGenerator) {
+-    parent::__construct($fileUrlGenerator);
+-    $this->fileUrlGenerator = $fileUrlGenerator;
+-  }
+ 
+   /**
+    * {@inheritdoc}
+diff --git a/src/Asset/JsCollectionOptimizer.php b/src/Asset/JsCollectionOptimizer.php
+index 1de8cfa..6216288 100644
+--- a/src/Asset/JsCollectionOptimizer.php
++++ b/src/Asset/JsCollectionOptimizer.php
+@@ -19,7 +19,7 @@ class JsCollectionOptimizer extends DrupalJsCollectionOptimizer {
+   public function deleteAll() {
+     $this->state->delete('system.js_cache_files');
+     /** @var \Drupal\Core\File\FileSystem $file_system */
+-    $file_system = \Drupal::service('file_system');
++    $file_system = $this->fileSystem;
+     $delete_stale = static function ($uri) use ($file_system) {
+       // Default stale file threshold is 30 days (2592000 seconds).
+       $stale_file_threshold = \Drupal::config('system.performance')->get('stale_file_threshold') ?? 2592000;
+diff --git a/tests/src/Unit/Flysystem/Adapter/CacheItemBackendTest.php b/tests/src/Unit/Flysystem/Adapter/CacheItemBackendTest.php
+index 8c56a70..6c23567 100644
+--- a/tests/src/Unit/Flysystem/Adapter/CacheItemBackendTest.php
++++ b/tests/src/Unit/Flysystem/Adapter/CacheItemBackendTest.php
+@@ -34,7 +34,8 @@ class CacheItemBackendTest extends UnitTestCase {
+   /**
+    * {@inheritdoc}
+    */
+-  public function setup(): void {
++  public function setUp(): void {
++    parent::setUp();
+     $this->cacheBackend = new MemoryBackend('foo');
+     $this->cacheItemBackend = new CacheItemBackend('test-scheme', $this->cacheBackend);
+   }
+diff --git a/tests/src/Unit/Flysystem/Adapter/DrupalCacheAdapterTest.php b/tests/src/Unit/Flysystem/Adapter/DrupalCacheAdapterTest.php
+index 8f796ac..0b6d04e 100644
+--- a/tests/src/Unit/Flysystem/Adapter/DrupalCacheAdapterTest.php
++++ b/tests/src/Unit/Flysystem/Adapter/DrupalCacheAdapterTest.php
+@@ -57,7 +57,8 @@ class DrupalCacheAdapterTest extends UnitTestCase {
+   /**
+    * {@inheritdoc}
+    */
+-  public function setup(): void {
++  public function setUp(): void {
++    parent::setUp();
+     $this->cacheItemBackend = new CacheItemBackend(static::SCHEME, new MemoryBackend('foo'));
+     $this->adapter = $this->prophesize(AdapterInterface::class);
+     $this->cacheAdapter = new DrupalCacheAdapter(static::SCHEME, $this->adapter->reveal(), $this->cacheItemBackend);
+diff --git a/tests/src/Unit/Flysystem/FtpTest.php b/tests/src/Unit/Flysystem/FtpTest.php
+index b4771d7..a4063b4 100644
+--- a/tests/src/Unit/Flysystem/FtpTest.php
++++ b/tests/src/Unit/Flysystem/FtpTest.php
+@@ -48,7 +48,7 @@ namespace Drupal\Tests\flysystem\Unit\Flysystem {
+     public function testEnsureReturnsNoErrorsOnSuccess() {
+       $result = (new Ftp(['host' => 'success']))->ensure();
+ 
+-      $this->assertSame(1, count($result));
++      $this->assertCount(1, $result);
+       $this->assertSame(RfcLogLevel::INFO, $result[0]['severity']);
+     }
+ 
+@@ -58,7 +58,7 @@ namespace Drupal\Tests\flysystem\Unit\Flysystem {
+     public function testEnsureReturnsErrors() {
+       $plugin = new Ftp([]);
+       $result = $plugin->ensure();
+-      $this->assertSame(1, count($result));
++      $this->assertCount(1, $result);
+       $this->assertSame(21, $result[0]['context']['%port']);
+     }
+ 
+diff --git a/tests/src/Unit/Flysystem/LocalTest.php b/tests/src/Unit/Flysystem/LocalTest.php
+index 9ef5be6..233f8b3 100644
+--- a/tests/src/Unit/Flysystem/LocalTest.php
++++ b/tests/src/Unit/Flysystem/LocalTest.php
+@@ -118,7 +118,7 @@ class LocalTest extends UnitTestCase {
+ 
+     $result = (new Local('foo/bar'))->ensure();
+ 
+-    $this->assertSame(1, count($result));
++    $this->assertCount(1, $result);
+     $this->assertSame(RfcLogLevel::INFO, $result[0]['severity']);
+     $this->assertSame('htcontent', file_get_contents('foo/bar/.htaccess'));
+   }
+@@ -131,7 +131,7 @@ class LocalTest extends UnitTestCase {
+     mkdir('foo/bar/.htaccess', 0777, TRUE);
+ 
+     $result = (new Local('foo/bar'))->ensure(TRUE);
+-    $this->assertSame(1, count($result));
++    $this->assertCount(1, $result);
+     $this->assertSame('https://www.drupal.org/SA-CORE-2013-003', $result[0]['context']['@url']);
+   }
+ 
+diff --git a/tests/src/Unit/Flysystem/MissingTest.php b/tests/src/Unit/Flysystem/MissingTest.php
+index 66c4c4f..d69a8bb 100644
+--- a/tests/src/Unit/Flysystem/MissingTest.php
++++ b/tests/src/Unit/Flysystem/MissingTest.php
+@@ -19,7 +19,7 @@ class MissingTest extends UnitTestCase {
+     $plugin = new Missing([]);
+     $this->assertInstanceOf(MissingAdapter::class, $plugin->getAdapter());
+     $this->assertTrue(is_array($plugin->ensure()));
+-    $this->assertSame(1, count($plugin->ensure()));
++    $this->assertCount(1, $plugin->ensure());
+     $this->assertSame('', $plugin->getExternalUrl('asdf'));
+   }
+ 
+diff --git a/tests/src/Unit/FlysystemServiceProviderTest.php b/tests/src/Unit/FlysystemServiceProviderTest.php
+index 0bb8bb8..02a16a0 100644
+--- a/tests/src/Unit/FlysystemServiceProviderTest.php
++++ b/tests/src/Unit/FlysystemServiceProviderTest.php
+@@ -34,6 +34,7 @@ class FlysystemServiceProviderTest extends UnitTestCase {
+    * {@inheritdoc}
+    */
+   public function setUp(): void {
++    parent::setUp();
+     $this->container = new ContainerBuilder();
+   }
+ 
+diff --git a/tests/src/Unit/Form/ConfigFormTest.php b/tests/src/Unit/Form/ConfigFormTest.php
+index 4390155..54f77fe 100644
+--- a/tests/src/Unit/Form/ConfigFormTest.php
++++ b/tests/src/Unit/Form/ConfigFormTest.php
+@@ -86,7 +86,7 @@ namespace Drupal\Tests\flysystem\Unit\Form {
+      */
+     public function testBuildForm() {
+       $form = $this->form->buildForm([], new FormState());
+-      $this->assertSame(4, count($form));
++      $this->assertCount(4, $form);
+ 
+       $this->assertTrue($form['sync_from']['#required']);
+       $this->assertTrue($form['sync_to']['#required']);
+@@ -105,12 +105,11 @@ namespace Drupal\Tests\flysystem\Unit\Form {
+       $form_state->setValue('sync_to', 'to');
+ 
+       $this->form->validateForm($form, $form_state);
+-      $this->assertSame(0, count($form_state->getErrors()));
+-
++      $this->assertCount(0, $form_state->getErrors());
+       $form_state->setValue('sync_to', 'from');
+ 
+       $this->form->validateForm($form, $form_state);
+-      $this->assertSame(2, count($form_state->getErrors()));
++      $this->assertCount(2, $form_state->getErrors());
+     }
+ 
+     /**
+@@ -127,7 +126,7 @@ namespace Drupal\Tests\flysystem\Unit\Form {
+       $batch = batch_set();
+ 
+       $this->assertSame(ConfigForm::class . '::finishBatch', $batch['finished']);
+-      $this->assertSame(0, count($batch['operations']));
++      $this->assertCount(0, $batch['operations']);
+ 
+       // Test with existing source files.
+       $from = new Filesystem(new MemoryAdapter());
+@@ -188,8 +187,8 @@ namespace Drupal\Tests\flysystem\Unit\Form {
+       ConfigForm::copyFile('failed_read', 'to_empty', 'does_not_exist', $context);
+ 
+       $to_files = $this->factory->reveal()->getFilesystem('to_empty')->listContents('', TRUE);
+-      $this->assertSame(0, count($to_files));
+-      $this->assertSame(1, count($context['results']['errors']));
++      $this->assertCount(0, $to_files);
++      $this->assertCount(1, $context['results']['errors']);
+     }
+ 
+     /**
+@@ -208,7 +207,7 @@ namespace Drupal\Tests\flysystem\Unit\Form {
+ 
+       ConfigForm::copyFile('from_files', 'to_fail', 'test.txt', $context);
+ 
+-      $this->assertSame(1, count($context['results']['errors']));
++      $this->assertCount(1, $context['results']['errors']);
+       $this->assertTrue(strpos($context['results']['errors'][0][0], 'could not be saved') !== FALSE);
+     }
+ 
+@@ -218,7 +217,7 @@ namespace Drupal\Tests\flysystem\Unit\Form {
+     public function testCopyFileException() {
+       $context = [];
+       ConfigForm::copyFile('from_empty', 'to_empty', 'does_not_exist.txt', $context);
+-      $this->assertSame(2, count($context['results']['errors']));
++      $this->assertCount(2, $context['results']['errors']);
+       $this->assertTrue(strpos($context['results']['errors'][0][0], 'An eror occured while copying') !== FALSE);
+       $this->assertTrue(strpos($context['results']['errors'][1], 'File not found at path') !== FALSE);
+     }
+diff --git a/tests/src/Unit/InstallFunctionsTest.php b/tests/src/Unit/InstallFunctionsTest.php
+index 220a3fc..cdbe926 100644
+--- a/tests/src/Unit/InstallFunctionsTest.php
++++ b/tests/src/Unit/InstallFunctionsTest.php
+@@ -51,7 +51,7 @@ class InstallFunctionsTest extends UnitTestCase {
+     $dependencies_exist = (int) class_exists(FlysystemStreamWrapper::class);
+ 
+     $return = flysystem_requirements('update');
+-    $this->assertSame(1 - $dependencies_exist, count($return));
++    $this->assertCount((1 - $dependencies_exist), $return);
+   }
+ 
+   /**
+@@ -61,7 +61,7 @@ class InstallFunctionsTest extends UnitTestCase {
+     $dependencies_exist = (int) class_exists(FlysystemStreamWrapper::class);
+ 
+     $return = flysystem_requirements('install');
+-    $this->assertSame(1 - $dependencies_exist, count($return));
++    $this->assertCount((1 - $dependencies_exist), $return);
+   }
+ 
+   /**
+@@ -82,7 +82,7 @@ class InstallFunctionsTest extends UnitTestCase {
+ 
+     $return = flysystem_requirements('runtime');
+ 
+-    $this->assertSame(2 - $dependencies_exist, count($return));
++    $this->assertCount((2 - $dependencies_exist), $return);
+     $this->assertSame('Test message', (string) $return['flysystem:testscheme']['description']);
+   }
+ 
+diff --git a/tests/src/Unit/Logger/ConvertTest.php b/tests/src/Unit/Logger/ConvertTest.php
+index e185cc0..c885879 100644
+--- a/tests/src/Unit/Logger/ConvertTest.php
++++ b/tests/src/Unit/Logger/ConvertTest.php
+@@ -16,6 +16,7 @@ class ConvertTest extends UnitTestCase {
+    * {@inheritdoc}
+    */
+   public function setUp(): void {
++    parent::setUp();
+     $consts = [
+       'REQUIREMENT_INFO' => -1,
+       'REQUIREMENT_OK' => 0,
+diff --git a/tests/src/Unit/PathProcessor/LocalPathProcessorTest.php b/tests/src/Unit/PathProcessor/LocalPathProcessorTest.php
+index 3d9aab3..9cd9e1e 100644
+--- a/tests/src/Unit/PathProcessor/LocalPathProcessorTest.php
++++ b/tests/src/Unit/PathProcessor/LocalPathProcessorTest.php
+@@ -24,6 +24,7 @@ class LocalPathProcessorTest extends UnitTestCase {
+    * {@inheritdoc}
+    */
+   public function setUp(): void {
++    parent::setUp();
+     new Settings(
+       [
+         'flysystem' => [
+diff --git a/tests/src/Unit/Plugin/FlysystemPluginManagerTest.php b/tests/src/Unit/Plugin/FlysystemPluginManagerTest.php
+index 24f074b..ef9f683 100644
+--- a/tests/src/Unit/Plugin/FlysystemPluginManagerTest.php
++++ b/tests/src/Unit/Plugin/FlysystemPluginManagerTest.php
+@@ -36,7 +36,7 @@ class FlysystemPluginManagerTest extends UnitTestCase {
+     ];
+ 
+     $method->invokeArgs($manager, [&$definitions]);
+-    $this->assertSame(2, count($definitions));
++    $this->assertCount(2, $definitions);
+     $this->assertArrayHasKey('test1', $definitions);
+     $this->assertArrayHasKey('test2', $definitions);
+     $this->assertArrayNotHasKey('test3', $definitions);
+diff --git a/tests/src/Unit/Routing/FlysystemRoutesTest.php b/tests/src/Unit/Routing/FlysystemRoutesTest.php
+index 145e094..4d3acc9 100644
+--- a/tests/src/Unit/Routing/FlysystemRoutesTest.php
++++ b/tests/src/Unit/Routing/FlysystemRoutesTest.php
+@@ -42,6 +42,7 @@ class FlysystemRoutesTest extends UnitTestCase {
+    * {@inheritdoc}
+    */
+   public function setUp(): void {
++    parent::setUp();
+     $container = new ContainerBuilder();
+ 
+     $stream_wrapper = $this->prophesize(LocalStream::class);
+@@ -134,7 +135,7 @@ class FlysystemRoutesTest extends UnitTestCase {
+     ]);
+ 
+     $routes = $this->router->routes();
+-    $this->assertSame(1, count($routes));
++    $this->assertCount(1, $routes);
+     $this->assertTrue(isset($routes['flysystem.test.serve']));
+   }
+ 
+@@ -157,7 +158,7 @@ class FlysystemRoutesTest extends UnitTestCase {
+ 
+     $this->moduleHandler->moduleExists('image')->willReturn(TRUE);
+     $routes = $this->router->routes();
+-    $this->assertSame(3, count($routes));
++    $this->assertCount(3, $routes);
+     $this->assertTrue(isset($routes['flysystem.image_style']));
+   }
+ 
