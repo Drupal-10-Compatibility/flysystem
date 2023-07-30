@@ -113,9 +113,6 @@
             "drupal/core": "-p2"
         },
         "patches": {
-          "flysystem": {
-            "Correct typo in EventSubscriberInterface class declaration": "patches/correct-typo-in-eventsubscriber-class.patch"
-          }
         }
     },
     "scripts": {
