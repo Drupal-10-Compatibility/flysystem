@@ -6,19 +6,6 @@
     "homepage": "https://www.drupal.org/project/flysystem",
     "repositories": [
         {
-            "type": "package",
-            "package": {
-                "name": "drupal/flysystem",
-                "version": "2.1.x-dev",
-                "type": "drupal-module",
-                "source": {
-                    "url": "https://github.com/codementality/flysystem.git",
-                    "type": "git",
-                    "reference": "2.1.x"
-                }                
-            }
-        },
-        {
             "type": "composer",
             "url": "https://packages.drupal.org/8"
         },
@@ -41,6 +28,7 @@
     },
     "require-dev": {
         "drupal/core-dev": "^10.1",
+        "phpcompatibility/php-compatibility": "8.1.0",
         "phpstan/phpstan-deprecation-rules": "^1.0"
     },
     "conflict": {
@@ -127,6 +115,10 @@
         },
         "patches": {
             "drupal/flysystem": {
+                "Issue #3227240: Use a different package for stream wrapper support": "https://git.drupalcode.org/project/flysystem/-/merge_requests/27/diffs.diff"
+            },
+            "phpcompatibility/php-compatibility": {
+                "Fixing php 8.1 compatibility issue swith php-compatibility-sniffer":"patches/php-compatibility-sniffer-8.1-patch.patch"
             }
         }
     },

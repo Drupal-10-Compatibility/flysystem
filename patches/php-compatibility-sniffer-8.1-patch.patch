@@ -1,0 +1,13 @@
+diff --git a/PHPCompatibility/Sniff.php b/PHPCompatibility/Sniff.php
+index 99a9761..2b0f1d3 100644
+--- a/PHPCompatibility/Sniff.php
++++ b/PHPCompatibility/Sniff.php
+@@ -106,7 +106,7 @@ abstract class Sniff implements \PHP_CodeSniffer_Sniff
+         static $arrTestVersions = array();
+ 
+         $default     = array(null, null);
+-        $testVersion = trim(PHPCSHelper::getConfigData('testVersion'));
++        $testVersion = trim(PHPCSHelper::getConfigData('testVersion') ?? '');
+ 
+         if (empty($testVersion) === false && isset($arrTestVersions[$testVersion]) === false) {
+ 
