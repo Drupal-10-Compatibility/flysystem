@@ -115,8 +115,7 @@
         },
         "patches": {
             "drupal/flysystem": {
-                "Issue #3227240: Use a different package for stream wrapper support": "https://git.drupalcode.org/project/flysystem/-/merge_requests/27/diffs.diff",
-                "Issue #3362802: Method EventSubscriberInterface::getSubscribedEvents() might add 'array' as a native return type declaration in the future.": "https://git.drupalcode.org/project/flysystem/-/merge_requests/28.diff"
+                "Issue #3227240: Use a different package for stream wrapper support": "https://git.drupalcode.org/project/flysystem/-/merge_requests/27/diffs.diff"
             },
             "phpcompatibility/php-compatibility": {
                 "Fixing php 8.1 compatibility issue swith php-compatibility-sniffer":"patches/php-compatibility-sniffer-8.1-patch.patch"
