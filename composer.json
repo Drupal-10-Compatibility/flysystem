@@ -6,6 +6,19 @@
     "homepage": "https://www.drupal.org/project/flysystem",
     "repositories": [
         {
+            "type": "package",
+            "package": {
+                "name": "drupal/flysystem",
+                "version": "2.1.x-dev",
+                "type": "drupal-module",
+                "source": {
+                    "url": "https://github.com/codementality/flysystem.git",
+                    "type": "git",
+                    "reference": "2.1.x"
+                }                
+            }
+        },
+        {
             "type": "composer",
             "url": "https://packages.drupal.org/8"
         },
@@ -114,7 +127,6 @@
         },
         "patches": {
             "drupal/flysystem": {
-                "Partial unit test fixes":"patches/unit-test-partial-fixes.patch"
             }
         }
     },
