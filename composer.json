@@ -115,7 +115,7 @@
         },
         "patches": {
             "drupal/flysystem": {
-                "#3378436: Invoking methods on $this in static functions is out of scope": "https://git.drupalcode.org/project/flysystem/-/merge_requests/29.diff"
+                "Issue #3239611: Download access to files on public filesystems should always be allowed": "https://git.drupalcode.org/project/flysystem/-/merge_requests/4.diff"
             },
             "phpcompatibility/php-compatibility": {
                 "Fixing php 8.1 compatibility issue swith php-compatibility-sniffer":"patches/php-compatibility-sniffer-8.1-patch.patch"
