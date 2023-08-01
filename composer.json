@@ -115,9 +115,7 @@
         },
         "patches": {
             "drupal/flysystem": {
-                "Revert Refactoring": "patches/revert-refactoring.patch",
-                "Patching EnsureSubscriber": "patches/patching-Ensure-Subscriber.patch",
-                "#3378436: Invoking methods on $this in static functions is out of scope": "patches/3378436-change-scope-of-static-method-calls.patch"
+                "#3378436: Invoking methods on $this in static functions is out of scope": "https://git.drupalcode.org/project/flysystem/-/merge_requests/29.diff"
             },
             "phpcompatibility/php-compatibility": {
                 "Fixing php 8.1 compatibility issue swith php-compatibility-sniffer":"patches/php-compatibility-sniffer-8.1-patch.patch"
