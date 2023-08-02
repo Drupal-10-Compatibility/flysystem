@@ -115,7 +115,8 @@
         },
         "patches": {
             "drupal/flysystem": {
-                "Issue #3239611: Download access to files on public filesystems should always be allowed": "https://git.drupalcode.org/project/flysystem/-/merge_requests/4.diff"
+                "Issue #3239611: Download access to files on public filesystems should always be allowed": "https://git.drupalcode.org/project/flysystem/-/merge_requests/4.diff",
+                "Issue #3311075: Rendering content too early PHP exception.": "https://www.drupal.org/files/issues/2022-09-22/rendering-content-to-%20-early-php-exception.patch"
             },
             "phpcompatibility/php-compatibility": {
                 "Fixing php 8.1 compatibility issue swith php-compatibility-sniffer":"patches/php-compatibility-sniffer-8.1-patch.patch"
