@@ -118,7 +118,7 @@
                 "Fixing php 8.1 compatibility issue swith php-compatibility-sniffer":"patches/php-compatibility-sniffer-8.1-patch.patch"
             },
             "drupal/flysystem": {
-                "Automated coding standards fixes": "patches/phpcbf-coding-standards-fixes.patch"
+                "Automated coding standards fixes": "patches/all-non-breaking-coding-standards-fixes.patch"
             }
         }
     },
