@@ -1,0 +1,225 @@
+diff --git a/flysystem.module b/flysystem.module
+index d6a1589..e9fb943 100644
+--- a/flysystem.module
++++ b/flysystem.module
+@@ -49,33 +49,34 @@ function flysystem_file_download($uri) {
+ 
+ /**
+  * Implements hook_entity_access().
++ *
+  * @see Drupal\file\FileAccessControlHandler
+  */
+ function flysystem_entity_access(EntityInterface $entity, $operation, AccountInterface $account) {
+-    if (!$entity instanceof FileInterface) {
+-        return AccessResult::neutral();
+-    }
++  if (!$entity instanceof FileInterface) {
++    return AccessResult::neutral();
++  }
+ 
+-    if (!in_array($operation, ['download', 'view'])) {
+-        return AccessResult::neutral();
+-    }
++  if (!in_array($operation, ['download', 'view'])) {
++    return AccessResult::neutral();
++  }
+ 
+-    $schemes = Drupal::service('flysystem_factory')->getSchemes();
+-    $scheme = StreamWrapperManager::getScheme($entity->getFileUri());
++  $schemes = Drupal::service('flysystem_factory')->getSchemes();
++  $scheme = StreamWrapperManager::getScheme($entity->getFileUri());
+ 
+-    if (!$scheme || !in_array($scheme, $schemes, TRUE)) {
+-        return AccessResult::neutral();
+-    }
++  if (!$scheme || !in_array($scheme, $schemes, TRUE)) {
++    return AccessResult::neutral();
++  }
+ 
+-    $settings = Settings::get('flysystem', []);
++  $settings = Settings::get('flysystem', []);
+ 
+-    if (empty($settings[$scheme]['config']['public'])) {
+-        return AccessResult::neutral();
+-    }
++  if (empty($settings[$scheme]['config']['public'])) {
++    return AccessResult::neutral();
++  }
+ 
+-    if ($operation === 'download') {
+-        return AccessResult::allowed();
+-    }
++  if ($operation === 'download') {
++    return AccessResult::allowed();
++  }
+ 
+-    return AccessResult::allowedIfHasPermission($account, 'access content');
++  return AccessResult::allowedIfHasPermission($account, 'access content');
+ }
+diff --git a/src/Flysystem/Ftp.php b/src/Flysystem/Ftp.php
+index b09427d..ccc4341 100644
+--- a/src/Flysystem/Ftp.php
++++ b/src/Flysystem/Ftp.php
+@@ -2,11 +2,14 @@
+ 
+ namespace Drupal\flysystem\Flysystem;
+ 
++use Drupal\Core\Language\LanguageManagerInterface;
+ use Drupal\Core\Logger\RfcLogLevel;
++use Drupal\Core\Plugin\ContainerFactoryPluginInterface;
+ use Drupal\flysystem\Flysystem\Adapter\MissingAdapter;
+ use Drupal\flysystem\Plugin\FlysystemPluginInterface;
+ use Drupal\flysystem\Plugin\FlysystemUrlTrait;
+ use League\Flysystem\Adapter\Ftp as FtpAdapter;
++use Symfony\Component\DependencyInjection\ContainerInterface;
+ 
+ /**
+  * Drupal plugin for the "FTP" Flysystem adapter.
+@@ -16,7 +19,7 @@ use League\Flysystem\Adapter\Ftp as FtpAdapter;
+  *   extensions = {"ftp"}
+  * )
+  */
+-class Ftp implements FlysystemPluginInterface {
++class Ftp implements FlysystemPluginInterface, ContainerFactoryPluginInterface {
+ 
+   use FlysystemUrlTrait;
+ 
+@@ -27,18 +30,38 @@ class Ftp implements FlysystemPluginInterface {
+    */
+   protected $configuration;
+ 
++  /**
++   * Drupal Language Manager service.
++   *
++   * @var \Drupal\Core\Language\LanguageManagerInterface
++   */
++  protected $languageManager;
++
+   /**
+    * Constructs an Ftp object.
+    *
+    * @param array $configuration
+    *   Plugin configuration array.
++   * @param \Drupal\Core\Language\LanguageManagerInterface $language_manager
++   *   Drupal Language Manager.
+    */
+-  public function __construct(array $configuration) {
++  public function __construct(array $configuration, LanguageManagerInterface $language_manager) {
+     $this->configuration = $configuration;
+ 
+     if (empty($this->configuration['host'])) {
+       $this->configuration['host'] = '127.0.0.1';
+     }
++    $this->languageManager = $language_manager;
++  }
++
++  /**
++   * {@inheritdoc}
++   */
++  public static function create(ContainerInterface $container, array $configuration, $plugin_id, $plugin_definition) {
++    return new static(
++      $configuration,
++      $container->get('language_manager')
++    );
+   }
+ 
+   /**
+diff --git a/src/Flysystem/Local.php b/src/Flysystem/Local.php
+index 840c3db..24cd061 100644
+--- a/src/Flysystem/Local.php
++++ b/src/Flysystem/Local.php
+@@ -5,6 +5,7 @@ namespace Drupal\flysystem\Flysystem;
+ use Drupal\Component\FileSecurity\FileSecurity;
+ use Drupal\Component\Utility\UrlHelper;
+ use Drupal\Core\File\FileSystem;
++use Drupal\Core\Language\LanguageManagerInterface;
+ use Drupal\Core\Logger\RfcLogLevel;
+ use Drupal\Core\Plugin\ContainerFactoryPluginInterface;
+ use Drupal\flysystem\Flysystem\Adapter\MissingAdapter;
+@@ -52,21 +53,31 @@ class Local implements FlysystemPluginInterface, ContainerFactoryPluginInterface
+    */
+   protected $rootExists;
+ 
++  /**
++   * Drupal Language Manager service.
++   *
++   * @var \Drupal\Core\Language\LanguageManagerInterface
++   */
++  protected $languageManager;
++
+   /**
+    * Constructs a Local object.
+    *
+    * @param string $root
+    *   The of the adapter's filesystem.
++   * @param \Drupal\Core\Language\LanguageManagerInterface $language_manager
++   *   Drupal Language Manager.
+    * @param bool $is_public
+    *   (optional) Whether this is a public file system. Defaults to false.
+    * @param int $directory_permission
+    *   (optional) The permissions to create directories with.
+    */
+-  public function __construct($root, $is_public = FALSE, $directory_permission = FileSystem::CHMOD_DIRECTORY) {
++  public function __construct($root, LanguageManagerInterface $language_manager, $is_public = FALSE, $directory_permission = FileSystem::CHMOD_DIRECTORY) {
+     $this->isPublic = $is_public;
+     $this->root = $root;
+     $this->directoryPerm = $directory_permission;
+     $this->rootExists = $this->ensureDirectory();
++    $this->languageManager = $language_manager;
+   }
+ 
+   /**
+@@ -75,6 +86,7 @@ class Local implements FlysystemPluginInterface, ContainerFactoryPluginInterface
+   public static function create(ContainerInterface $container, array $configuration, $plugin_id, $plugin_definition) {
+     return new static(
+       $configuration['root'],
++      $container->get('language_manager'),
+       !empty($configuration['public']),
+       $container->get('settings')->get('file_chmod_directory', FileSystem::CHMOD_DIRECTORY)
+     );
+diff --git a/src/Plugin/FlysystemUrlTrait.php b/src/Plugin/FlysystemUrlTrait.php
+index 0062dba..f95aa20 100644
+--- a/src/Plugin/FlysystemUrlTrait.php
++++ b/src/Plugin/FlysystemUrlTrait.php
+@@ -31,8 +31,9 @@ trait FlysystemUrlTrait {
+       'scheme' => $this->getScheme($uri),
+       'filepath' => $path,
+     ];
++    $language = $this->languageManager->getDefaultLanguage();
+ 
+-    return Url::fromRoute('flysystem.serve', $arguments, ['absolute' => TRUE])->toString();
++    return Url::fromRoute('flysystem.serve', $arguments, ['absolute' => TRUE, 'language' => $language])->toString();
+   }
+ 
+   /**
+diff --git a/src/Routing/FlysystemRoutes.php b/src/Routing/FlysystemRoutes.php
+index d1ad705..d483812 100644
+--- a/src/Routing/FlysystemRoutes.php
++++ b/src/Routing/FlysystemRoutes.php
+@@ -99,7 +99,7 @@ class FlysystemRoutes implements ContainerInjectionInterface {
+           '_access' => 'TRUE',
+         ],
+         [
+-          '_maintenance_access' => 'TRUE'
++          '_maintenance_access' => 'TRUE',
+         ]
+       );
+ 
+@@ -116,7 +116,7 @@ class FlysystemRoutes implements ContainerInjectionInterface {
+             '_access' => 'TRUE',
+           ],
+           [
+-            '_maintenance_access' => 'TRUE'
++            '_maintenance_access' => 'TRUE',
+           ]
+         );
+       }
+@@ -135,7 +135,7 @@ class FlysystemRoutes implements ContainerInjectionInterface {
+           'scheme' => '^[a-zA-Z0-9+.-]+$',
+         ],
+         [
+-          '_maintenance_access' => 'TRUE'
++          '_maintenance_access' => 'TRUE',
+         ]
+       );
+     }
