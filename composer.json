@@ -114,9 +114,6 @@
             "drupal/core": "-p2"
         },
         "patches": {
-            "drupal/flysystem": {
-                "#3039574: getExternalUrl() gives wrong url to the file": "https://git.drupalcode.org/project/flysystem/-/merge_requests/42.diff"
-            },
             "phpcompatibility/php-compatibility": {
                 "Fixing php 8.1 compatibility issue swith php-compatibility-sniffer":"patches/php-compatibility-sniffer-8.1-patch.patch"
             }
