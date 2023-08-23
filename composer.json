@@ -21,7 +21,7 @@
         "drupal/core-composer-scaffold": "^10.1",
         "drupal/core-recommended": "^10.1",
         "drupal/flysystem": "2.1.x-dev",
-        "drush/drush": "^11.0",
+        "drush/drush": "^12.0",
         "league/flysystem": "^1.0.3",
         "league/flysystem-replicate-adapter": "~1.0",
         "oomphinc/composer-installers-extender": "^2.0",
@@ -115,8 +115,7 @@
         },
         "patches": {
             "drupal/flysystem": {
-                "Issue #3239611: Download access to files on public filesystems should always be allowed": "https://git.drupalcode.org/project/flysystem/-/merge_requests/4.diff",
-                "Issue #2661588: Support delivering local image styles until remote upload is complete": "https://git.drupalcode.org/project/flysystem/-/merge_requests/7.diff"
+                "#3039574: getExternalUrl() gives wrong url to the file": "https://git.drupalcode.org/project/flysystem/-/merge_requests/42.diff"
             },
             "phpcompatibility/php-compatibility": {
                 "Fixing php 8.1 compatibility issue swith php-compatibility-sniffer":"patches/php-compatibility-sniffer-8.1-patch.patch"
