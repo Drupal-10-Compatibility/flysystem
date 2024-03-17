@@ -2,7 +2,7 @@
 
 ## Overview
 
-The purpose of this project is to leverage Github Actions to build a Drupal 10 site, install the above module, and conduct the following:
+The purpose of this project is to leverage Github Actions to build a Drupal 10.2 site, install the above module, and conduct the following:
 
 * Static Analysis:  Use phpstan-drupal extension for phpstan to conduct a static scan of the module codebase for deprecations for both PHP 8 and Drupal 10.
 * Coding Standards:  Check for compliance with Drupal Coding Standards.
