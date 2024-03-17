@@ -117,6 +117,9 @@
         "patches": {
             "phpcompatibility/php-compatibility": {
                 "Fixing php 8.2 compatibility issue swith php-compatibility-sniffer":"patches/php-compatibility-sniffer-8.1-patch.patch"
+            },
+            "drupal/flysystem": {
+                "#3415603: CssCollectionOptimizerLazy and JsCollectionOptimizerLazy use removed inherited member state": "https://git.drupalcode.org/project/flysystem/-/merge_requests/46.diff"
             }
         }
     },
