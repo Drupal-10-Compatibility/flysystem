@@ -1,0 +1,23 @@
+diff --git a/tests/src/Kernel/CollectionOptimizerTest.php b/tests/src/Kernel/CollectionOptimizerTest.php
+index 9fb14f7..bfc8354 100644
+--- a/tests/src/Kernel/CollectionOptimizerTest.php
++++ b/tests/src/Kernel/CollectionOptimizerTest.php
+@@ -11,6 +11,7 @@ use Drupal\flysystem\Asset\CssCollectionOptimizer;
+ use Drupal\flysystem\Asset\JsCollectionOptimizer;
+ use Drupal\KernelTests\KernelTestBase;
+ use org\bovigo\vfs\vfsStream;
++use Psr\Log\LoggerInterface;
+ 
+ /**
+  * @covers \Drupal\flysystem\Asset\JsCollectionOptimizer
+@@ -75,8 +76,9 @@ class CollectionOptimizerTest extends KernelTestBase {
+     $grouper = $this->prophesize(AssetCollectionGrouperInterface::class);
+     $dumper = $this->prophesize(AssetDumper::class);
+     $state = $this->prophesize(StateInterface::class);
++    $logger = $this->prophesize(LoggerInterface::class);
+ 
+-    $optimizer = new JsCollectionOptimizer($grouper->reveal(), new JsOptimizer(), $dumper->reveal(), $state->reveal(), $this->container->get('file_system'));
++    $optimizer = new JsCollectionOptimizer($grouper->reveal(), new JsOptimizer($logger->reveal()), $dumper->reveal(), $state->reveal(), $this->container->get('file_system'));
+     $optimizer->deleteAll();
+ 
+     foreach ($this->jsFilesUnderTest() as $js_file => $expired) {

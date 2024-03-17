@@ -1,0 +1,216 @@
+diff --git a/tests/src/Kernel/CollectionOptimizerLazyTest.php b/tests/src/Kernel/CollectionOptimizerLazyTest.php
+new file mode 100644
+index 0000000..bad470f
+--- /dev/null
++++ b/tests/src/Kernel/CollectionOptimizerLazyTest.php
+@@ -0,0 +1,210 @@
++<?php
++
++namespace Drupal\Tests\flysystem\Kernel;
++
++use Drupal\Core\Asset\AssetCollectionGrouperInterface;
++use Drupal\Core\Asset\CssOptimizer;
++use Drupal\Core\Asset\JsOptimizer;
++use Drupal\flysystem\Asset\CssCollectionOptimizerLazy;
++use Drupal\flysystem\Asset\JsCollectionOptimizerLazy;
++use Drupal\KernelTests\KernelTestBase;
++use org\bovigo\vfs\vfsStream;
++use Psr\Log\LoggerInterface;
++
++/**
++ * @covers \Drupal\flysystem\Asset\JsCollectionOptimizerLazy
++ * @covers \Drupal\flysystem\Asset\CssCollectionOptimizerLazy
++ *
++ * @group flysystem
++ */
++class CollectionOptimizerLazyTest extends KernelTestBase {
++
++  /**
++   * {@inheritdoc}
++   */
++  protected static $modules = ['file'];
++
++  /**
++   * The file URL generator.
++   *
++   * @var \Drupal\Core\File\FileUrlGeneratorInterface
++   */
++  protected $fileUrlGenerator;
++
++  /**
++   * {@inheritdoc}
++   */
++  public function setUp(): void {
++    parent::setUp();
++    $this->fileUrlGenerator = $this->container->get('file_url_generator');
++    $this->cleanUp();
++  }
++
++  /**
++   * {@inheritdoc}
++   */
++  public function tearDown(): void {
++    $this->cleanUp();
++    parent::tearDown();
++  }
++
++  /**
++   * @covers \Drupal\flysystem\Asset\JsCollectionOptimizerLazy
++   */
++  public function testJsCollectionOptimizerLazy() {
++    vfsStream::setup('js');
++
++    $this->setSetting('flysystem', [
++      'vfs' => [
++        'serve_js' => TRUE,
++        'driver' => 'local',
++      ],
++    ]);
++
++    foreach ($this->jsFilesUnderTest() as $js_file => $expired) {
++      file_put_contents($js_file, 'dummy');
++      $this->assertTrue(
++        !empty(file_get_contents($js_file))
++      );
++
++      if ($expired === TRUE) {
++        // 2592000 is the default value of stale_file_threshold
++        touch($js_file, \Drupal::time()->getRequestTime() - 2592001);
++        continue;
++      }
++      touch($js_file, \Drupal::time()->getRequestTime() - 2591900);
++    }
++
++    $grouper = $this->prophesize(AssetCollectionGrouperInterface::class);
++    $logger = $this->prophesize(LoggerInterface::class);
++
++    $optimizer = new JsCollectionOptimizerLazy(
++      $grouper->reveal(),
++      new JsOptimizer($logger->reveal()),
++      $this->container->get('theme.manager'),
++      $this->container->get('library.dependency_resolver'),
++      $this->container->get('request_stack'),
++      $this->container->get('file_system'),
++      $this->container->get('config.factory'),
++      $this->container->get('file_url_generator'),
++      $this->container->get('datetime.time'),
++      $this->container->get('language_manager')
++    );
++    $optimizer->deleteAll();
++
++    foreach ($this->jsFilesUnderTest() as $js_file => $expired) {
++      if ($expired === TRUE) {
++        $this->assertFileDoesNotExist($js_file);
++        continue;
++      }
++      $this->assertFileExists($js_file);
++    }
++
++  }
++
++  /**
++   * @covers \Drupal\flysystem\Asset\CssCollectionOptimizerLazy
++   */
++  public function testCssCollectionOptimizerLazy() {
++    vfsStream::setup('css');
++
++    $this->setSetting('flysystem', [
++      'vfs' => [
++        'serve_css' => TRUE,
++        'driver' => 'local',
++      ],
++    ]);
++
++    foreach ($this->cssFilesUnderTest() as $css_file => $expired) {
++      file_put_contents($css_file, 'dummy');
++      $this->assertTrue(
++        !empty(file_get_contents($css_file))
++      );
++      if ($expired === TRUE) {
++        // 2592000 is the default value of stale_file_threshold
++        touch($css_file, \Drupal::time()->getRequestTime() - 2592001);
++        continue;
++      }
++      touch($css_file, \Drupal::time()->getRequestTime() - 2591900);
++    }
++
++    $grouper = $this->prophesize(AssetCollectionGrouperInterface::class);
++
++    $optimizer = new CssCollectionOptimizerLazy(
++      $grouper->reveal(),
++      new CssOptimizer($this->fileUrlGenerator),
++
++      $this->container->get('theme.manager'),
++      $this->container->get('library.dependency_resolver'),
++      $this->container->get('request_stack'),
++      $this->container->get('file_system'),
++      $this->container->get('config.factory'),
++      $this->container->get('file_url_generator'),
++      $this->container->get('datetime.time'),
++      $this->container->get('language_manager')
++    );
++    $optimizer->deleteAll();
++
++    foreach ($this->cssFilesUnderTest() as $css_file => $expired) {
++      if ($expired === TRUE) {
++        $this->assertFileDoesNotExist($css_file);
++        continue;
++      }
++      $this->assertFileExists($css_file);
++    }
++
++  }
++
++  /**
++   * CSS files involve in testing CssCollectionOptimizerLazy.
++   *
++   * @return array
++   *   Keyed by the file URI, and its value is the flag of expiration. TRUE to
++   *   valid, FALSE to expired.
++   */
++  private function cssFilesUnderTest() {
++    return [
++      'vfs://css/foo_expired.css' => TRUE,
++      'vfs://css/bar_expired.css' => TRUE,
++      'vfs://css/baz_expired.css' => TRUE,
++      'vfs://css/foo.css' => FALSE,
++      'vfs://css/bar.css' => FALSE,
++      'vfs://css/baz.css' => FALSE,
++    ];
++  }
++
++  /**
++   * JS files involve in testing JsCollectionOptimizerLazy.
++   *
++   * @return array
++   *   Keyed by the file URI, and its value is the flag of expiration. TRUE to
++   *   expired, FALSE to non-expired.
++   */
++  private function jsFilesUnderTest() {
++    return [
++      'vfs://js/foo_expired.js' => TRUE,
++      'vfs://js/bar_expired.js' => TRUE,
++      'vfs://js/baz_expired.js' => TRUE,
++      'vfs://js/foo.js' => FALSE,
++      'vfs://js/bar.js' => FALSE,
++      'vfs://js/zoo.js' => FALSE,
++    ];
++  }
++
++  /**
++   * A helper method for removing files before and after running tests.
++   */
++  private function cleanUp() {
++    foreach ($this->jsFilesUnderTest() as $js_file => $flag) {
++      if (file_exists($js_file)) {
++        unlink($js_file);
++      }
++    }
++    foreach ($this->cssFilesUnderTest() as $css_file => $flag) {
++      if (file_exists($css_file)) {
++        unlink($css_file);
++      }
++    }
++  }
++
++}

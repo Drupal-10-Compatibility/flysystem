@@ -1,0 +1,72 @@
+diff --git a/tests/src/Kernel/CollectionOptimizerLazyTest.php b/tests/src/Kernel/CollectionOptimizerLazyTest.php
+index a89aa04..d7fae13 100644
+--- a/tests/src/Kernel/CollectionOptimizerLazyTest.php
++++ b/tests/src/Kernel/CollectionOptimizerLazyTest.php
+@@ -9,6 +9,7 @@ use Drupal\flysystem\Asset\CssCollectionOptimizerLazy;
+ use Drupal\flysystem\Asset\JsCollectionOptimizerLazy;
+ use Drupal\KernelTests\KernelTestBase;
+ use org\bovigo\vfs\vfsStream;
++use Psr\Log\LoggerInterface;
+ 
+ /**
+  * @covers \Drupal\flysystem\Asset\JsCollectionOptimizerLazy
+@@ -48,9 +49,9 @@ class CollectionOptimizerLazyTest extends KernelTestBase {
+   }
+ 
+   /**
+-   * @covers \Drupal\flysystem\Asset\JsCollectionOptimizer
++   * @covers \Drupal\flysystem\Asset\JsCollectionOptimizerLazy
+    */
+-  public function testJsCollectionOptimizer() {
++  public function testJsCollectionOptimizerLazy() {
+     vfsStream::setup('js');
+ 
+     $this->setSetting('flysystem', [
+@@ -73,7 +74,7 @@ class CollectionOptimizerLazyTest extends KernelTestBase {
+     $grouper = $this->prophesize(AssetCollectionGrouperInterface::class);
+     $logger = $this->prophesize(LoggerInterface::class);
+ 
+-    $optimizer = new JsCollectionOptimizer(
++    $optimizer = new JsCollectionOptimizerLazy(
+       $grouper->reveal(),
+       new JsOptimizer($logger->reveal()),
+       $this->container->get('theme.manager'),
+@@ -98,9 +99,9 @@ class CollectionOptimizerLazyTest extends KernelTestBase {
+   }
+ 
+   /**
+-   * @covers \Drupal\flysystem\Asset\CssCollectionOptimizer
++   * @covers \Drupal\flysystem\Asset\CssCollectionOptimizerLazy
+    */
+-  public function testCssCollectionOptimizer() {
++  public function testCssCollectionOptimizerLazy() {
+     vfsStream::setup('css');
+ 
+     $this->setSetting('flysystem', [
+@@ -122,7 +123,7 @@ class CollectionOptimizerLazyTest extends KernelTestBase {
+ 
+     $grouper = $this->prophesize(AssetCollectionGrouperInterface::class);
+ 
+-    $optimizer = new CssCollectionOptimizer(
++    $optimizer = new CssCollectionOptimizerLazy(
+       $grouper->reveal(),
+       new CssOptimizer($this->fileUrlGenerator),
+ 
+@@ -148,7 +149,7 @@ class CollectionOptimizerLazyTest extends KernelTestBase {
+   }
+ 
+   /**
+-   * CSS files involve in testing CssCollectionOptimizer.
++   * CSS files involve in testing CssCollectionOptimizerLazy.
+    *
+    * @return array
+    *   Keyed by the file URI, and its value is the flag of expiration. TRUE to
+@@ -166,7 +167,7 @@ class CollectionOptimizerLazyTest extends KernelTestBase {
+   }
+ 
+   /**
+-   * JS files involve in testing JsCollectionOptimizer.
++   * JS files involve in testing JsCollectionOptimizerLazy.
+    *
+    * @return array
+    *   Keyed by the file URI, and its value is the flag of expiration. TRUE to
