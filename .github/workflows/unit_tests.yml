@@ -10,7 +10,7 @@ on:
 jobs:
   run-unit-tests:
     name: Run Unit Tests
-    runs-on:  ubuntu-latest
+    runs-on:  ubuntu-22.04
     env:
       MODULE: flysystem
       COMPOSER_MEMORY_LIMIT: -1
@@ -49,7 +49,7 @@ jobs:
         id: composercache
         run: echo "::set-output name=dir::$(composer config cache-files-dir)"
       - name: Cache composer dependencies
-        uses: actions/cache@v2
+        uses: actions/cache@v3
         with:
           path: ${{ steps.composercache.outputs.dir }}
           # Use composer.json for key, if composer.lock is not committed
