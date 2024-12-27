@@ -120,7 +120,7 @@
                 "Fixing php 8.2 compatibility issue swith php-compatibility-sniffer":"patches/php-compatibility-sniffer-8.1-patch.patch"
             },
             "drupal/flysystem": {
-                "coding-standards-d10.4-php8.2": "patches/coding-standards-1.patch"
+                "coding-standards-d10.4-php8.2": "patches/coding-standards-static-analyze-1.patch"
             }
         }
     },
