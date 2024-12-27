@@ -2,7 +2,7 @@
 ## Description: Run installation sequences in the web container: composer install, drush site:install
 ## Usage: install
 ## Example: "ddev install"
-
+git config --global --add safe.directory /var/www/html
 echo "Installing composer dependencies (with development dependencies)."
 composer install --no-interaction --no-progress --apcu-autoloader || exit 1;
 echo "Composer packages are installed"
