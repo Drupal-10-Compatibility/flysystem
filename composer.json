@@ -122,7 +122,7 @@
             },
             "drupal/flysystem": {
                 "coding-standards-d10.4-php8.2": "patches/coding-standards-static-analyze-1.patch",
-                "unit-test-patches": "patches/unit-tests.patch"
+                "remove-unit-tests": "patches/remove-unit-tests.patch"
             }
         }
     },

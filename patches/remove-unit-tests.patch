@@ -1,0 +1,2541 @@
+diff --git a/tests/src/Unit/Asset/SchemeExtensionTraitTest.php b/tests/src/Unit/Asset/SchemeExtensionTraitTest.php
+deleted file mode 100644
+index a9a01a9..0000000
+--- a/tests/src/Unit/Asset/SchemeExtensionTraitTest.php
++++ /dev/null
+@@ -1,33 +0,0 @@
+-<?php
+-
+-namespace Drupal\Tests\flysystem\Unit\Asset;
+-
+-use Drupal\Core\Site\Settings;
+-use Drupal\flysystem\Asset\SchemeExtensionTrait;
+-use Drupal\Tests\UnitTestCase;
+-
+-/**
+- * @coversDefaultClass \Drupal\flysystem\Asset\SchemeExtensionTrait
+- * @group flysystem
+- */
+-class SchemeExtensionTraitTest extends UnitTestCase {
+-
+-  /**
+-   * @covers ::getSchemeForExtension
+-   */
+-  public function test() {
+-
+-    new Settings([
+-      'flysystem' => [
+-        'local' => ['serve_js' => TRUE, 'driver' => 'asdf'],
+-        'ftp' => ['serve_css' => TRUE],
+-      ],
+-    ]);
+-
+-    $trait = $this->getMockForTrait(SchemeExtensionTrait::class);
+-    $this->assertSame('local', $trait->getSchemeForExtension('js'));
+-    $this->assertSame('public', $trait->getSchemeForExtension('css'));
+-    $this->assertSame('public', $trait->getSchemeForExtension('jpg'));
+-  }
+-
+-}
+diff --git a/tests/src/Unit/Event/EnsureEventTest.php b/tests/src/Unit/Event/EnsureEventTest.php
+deleted file mode 100644
+index 8960845..0000000
+--- a/tests/src/Unit/Event/EnsureEventTest.php
++++ /dev/null
+@@ -1,29 +0,0 @@
+-<?php
+-
+-namespace Drupal\Tests\flysystem\Unit\Event;
+-
+-use Drupal\flysystem\Event\EnsureEvent;
+-use Drupal\Tests\UnitTestCase;
+-
+-/**
+- * Tests EnsureEvent.
+- *
+- * @coversDefaultClass \Drupal\flysystem\Event\EnsureEvent
+- * @covers \Drupal\flysystem\Event\EnsureEvent
+- * @group flysystem
+- */
+-class EnsureEventTest extends UnitTestCase {
+-
+-  /**
+-   * Tests the basic setters/getters of EnsureEvent.
+-   */
+-  public function test() {
+-    $event = new EnsureEvent('scheme', 10, 'message', ['1234']);
+-
+-    $this->assertSame('scheme', $event->getScheme());
+-    $this->assertSame(10, $event->getSeverity());
+-    $this->assertSame('message', $event->getMessage());
+-    $this->assertSame(['1234'], $event->getContext());
+-  }
+-
+-}
+diff --git a/tests/src/Unit/EventSubscriber/EnsureSubscriberTest.php b/tests/src/Unit/EventSubscriber/EnsureSubscriberTest.php
+deleted file mode 100644
+index 2b2effd..0000000
+--- a/tests/src/Unit/EventSubscriber/EnsureSubscriberTest.php
++++ /dev/null
+@@ -1,44 +0,0 @@
+-<?php
+-
+-namespace Drupal\Tests\flysystem\Unit\EventSubscriber;
+-
+-use Drupal\flysystem\Event\EnsureEvent;
+-use Drupal\flysystem\Event\FlysystemEvents;
+-use Drupal\flysystem\EventSubscriber\EnsureSubscriber;
+-use Drupal\Tests\UnitTestCase;
+-use Psr\Log\LoggerInterface;
+-use Symfony\Contracts\EventDispatcher\EventDispatcherInterface;
+-
+-/**
+- * @coversDefaultClass \Drupal\flysystem\EventSubscriber\EnsureSubscriber
+- * @covers \Drupal\flysystem\EventSubscriber\EnsureSubscriber
+- *
+- * @group flysystem
+- */
+-class EnsureSubscriberTest extends UnitTestCase {
+-
+-  /**
+-   * Tests that the event subscriber logs ensure() calls.
+-   */
+-  public function testLoggingHappens() {
+-    $logger = $this->prophesize(LoggerInterface::class);
+-    $dispatcher = $this->createMock(EventDispatcherInterface::class);
+-    $logger->log('severity', 'message', ['context'])->shouldBeCalled();
+-
+-    $event = new EnsureEvent('scheme', 'severity', 'message', ['context']);
+-
+-    $subscriber = new EnsureSubscriber($logger->reveal());
+-
+-    $subscriber->onEnsure($event, FlysystemEvents::ENSURE, $dispatcher);
+-  }
+-
+-  /**
+-   * Tests that the ENSURE event is registered.
+-   */
+-  public function testSubscribedEvents() {
+-    $result = EnsureSubscriber::getSubscribedEvents();
+-
+-    $this->assertTrue(isset($result[FlysystemEvents::ENSURE]));
+-  }
+-
+-}
+diff --git a/tests/src/Unit/Flysystem/Adapter/CacheItemBackendTest.php b/tests/src/Unit/Flysystem/Adapter/CacheItemBackendTest.php
+deleted file mode 100644
+index 6c23567..0000000
+--- a/tests/src/Unit/Flysystem/Adapter/CacheItemBackendTest.php
++++ /dev/null
+@@ -1,100 +0,0 @@
+-<?php
+-
+-namespace Drupal\Tests\flysystem\Unit\Flysystem\Adapter;
+-
+-use Drupal\Core\Cache\MemoryBackend;
+-use Drupal\flysystem\Flysystem\Adapter\CacheItem;
+-use Drupal\flysystem\Flysystem\Adapter\CacheItemBackend;
+-use Drupal\Tests\UnitTestCase;
+-
+-/**
+- * Tests \Drupal\flysystem\Flysystem\Adapter\CacheItemBackend.
+- *
+- * @group flysystem
+- *
+- * @coversDefaultClass \Drupal\flysystem\Flysystem\Adapter\CacheItemBackend
+- * @covers \Drupal\flysystem\Flysystem\Adapter\CacheItemBackend
+- */
+-class CacheItemBackendTest extends UnitTestCase {
+-
+-  /**
+-   * The cache backend used in the CacheItemBackend.
+-   *
+-   * @var \Drupal\Core\Cache\CacheBackendInterface
+-   */
+-  protected $cacheBackend;
+-
+-  /**
+-   * The cache item backend to test.
+-   *
+-   * @var \Drupal\flysystem\Flysystem\Adapter\CacheItemBackend
+-   */
+-  protected $cacheItemBackend;
+-
+-  /**
+-   * {@inheritdoc}
+-   */
+-  public function setUp(): void {
+-    parent::setUp();
+-    $this->cacheBackend = new MemoryBackend('foo');
+-    $this->cacheItemBackend = new CacheItemBackend('test-scheme', $this->cacheBackend);
+-  }
+-
+-  /**
+-   * Tests whether a cache item exists.
+-   */
+-  public function testHas() {
+-    $this->assertFalse($this->cacheItemBackend->has('test.txt'));
+-  }
+-
+-  /**
+-   * Tests loading a cache item from the cache.
+-   */
+-  public function testSetIsLoaded() {
+-    $cache_item = new CacheItem();
+-    $cache_item->updateMetadata(['mimetype' => 'test_mimetype']);
+-    $this->cacheItemBackend->set('test_path', $cache_item);
+-
+-    $metadata = $this->cacheItemBackend->load('test_path')->getMetadata();
+-    $this->assertSame('test_mimetype', $metadata['mimetype']);
+-  }
+-
+-  /**
+-   * Tests when loading a cache item creates a new item.
+-   */
+-  public function testLoadMiss() {
+-    $item = $this->cacheItemBackend->load('test_path');
+-    $this->assertInstanceOf(CacheItem::class, $item);
+-  }
+-
+-  /**
+-   * Tests deleting by a path.
+-   */
+-  public function testDelete() {
+-    $cache_item = new CacheItem();
+-    $cache_item->updateMetadata(['mimetype' => 'test_mimetype']);
+-
+-    $this->cacheItemBackend->set('test_path', $cache_item);
+-    $this->cacheItemBackend->delete('test_path');
+-
+-    $metadata = $this->cacheItemBackend->load('test_path')->getMetadata();
+-    $this->assertTrue(empty($metadata['mimetype']));
+-  }
+-
+-  /**
+-   * Tests deleting multiple items at once.
+-   */
+-  public function testDeleteMultiple() {
+-    $cache_item_one = new CacheItem();
+-    $cache_item_two = new CacheItem();
+-
+-    $this->cacheItemBackend->set('one', $cache_item_one);
+-    $this->cacheItemBackend->set('two', $cache_item_two);
+-
+-    $this->cacheItemBackend->deleteMultiple(['one', 'two']);
+-
+-    $this->assertNotSame($cache_item_one, $this->cacheItemBackend->load('one'));
+-    $this->assertNotSame($cache_item_two, $this->cacheItemBackend->load('two'));
+-  }
+-
+-}
+diff --git a/tests/src/Unit/Flysystem/Adapter/CacheItemTest.php b/tests/src/Unit/Flysystem/Adapter/CacheItemTest.php
+deleted file mode 100644
+index 70a91bf..0000000
+--- a/tests/src/Unit/Flysystem/Adapter/CacheItemTest.php
++++ /dev/null
+@@ -1,42 +0,0 @@
+-<?php
+-
+-namespace Drupal\Tests\flysystem\Unit\Flysystem\Adapter;
+-
+-use Drupal\flysystem\Flysystem\Adapter\CacheItem;
+-use Drupal\Tests\UnitTestCase;
+-
+-/**
+- * Tests \Drupal\flysystem\Flysystem\Adapter\CacheItem.
+- *
+- * @group flysystem
+- *
+- * @coversDefaultClass \Drupal\flysystem\Flysystem\Adapter\CacheItem
+- * @covers \Drupal\flysystem\Flysystem\Adapter\CacheItem
+- */
+-class CacheItemTest extends UnitTestCase {
+-
+-  /**
+-   * Tests metadata updating and getting.
+-   */
+-  public function test() {
+-    $cache_item = new CacheItem();
+-
+-    $metadata = [
+-      'size' => 1234,
+-      'mimetype' => 'test_mimetype',
+-      'visibility' => 'public',
+-      'timestamp' => 123456,
+-      'type' => 'file',
+-      'contents' => 'test contents',
+-      'path' => 'file_path',
+-    ];
+-
+-    $cache_item->updateMetadata($metadata);
+-
+-    unset($metadata['contents'], $metadata['path']);
+-
+-    $this->assertSame($metadata, $cache_item->getMetadata());
+-
+-  }
+-
+-}
+diff --git a/tests/src/Unit/Flysystem/Adapter/DrupalCacheAdapterTest.php b/tests/src/Unit/Flysystem/Adapter/DrupalCacheAdapterTest.php
+deleted file mode 100644
+index 0b6d04e..0000000
+--- a/tests/src/Unit/Flysystem/Adapter/DrupalCacheAdapterTest.php
++++ /dev/null
+@@ -1,299 +0,0 @@
+-<?php
+-
+-namespace Drupal\Tests\flysystem\Unit\Flysystem\Adapter;
+-
+-use Drupal\Core\Cache\MemoryBackend;
+-use Drupal\flysystem\Flysystem\Adapter\CacheItemBackend;
+-use Drupal\flysystem\Flysystem\Adapter\DrupalCacheAdapter;
+-use Drupal\Tests\UnitTestCase;
+-use League\Flysystem\AdapterInterface;
+-use League\Flysystem\Config;
+-
+-/**
+- * Test the Drupal Cache Adapter.
+- *
+- * @group flysystem
+- *
+- * @coversDefaultClass \Drupal\flysystem\Flysystem\Adapter\DrupalCacheAdapter
+- * @covers \Drupal\flysystem\Flysystem\Adapter\DrupalCacheAdapter
+- */
+-class DrupalCacheAdapterTest extends UnitTestCase {
+-
+-  /**
+-   * URI scheme to use for testing.
+-   *
+-   * @var string
+-   */
+-  const SCHEME = 'test-scheme';
+-
+-  /**
+-   * The main test file.
+-   *
+-   * @var string
+-   */
+-  const FILE = 'test.txt';
+-
+-  /**
+-   * The wrapped Flysytem adaper.
+-   *
+-   * @var \League\Flysystem\AdapterInterface|\PHPUnit_Framework_MockObject_MockObject
+-   */
+-  protected $adapter;
+-
+-  /**
+-   * The cache adapter under test.
+-   *
+-   * @var \Drupal\flysystem\Flysystem\Adapter\DrupalCacheAdapter
+-   */
+-  protected $cacheAdapter;
+-
+-  /**
+-   * The flysystem backend for testing.
+-   *
+-   * @var \Drupal\flysystem\Flysystem\Adapter\CacheItemBackend
+-   */
+-  protected $cacheItemBackend;
+-
+-  /**
+-   * {@inheritdoc}
+-   */
+-  public function setUp(): void {
+-    parent::setUp();
+-    $this->cacheItemBackend = new CacheItemBackend(static::SCHEME, new MemoryBackend('foo'));
+-    $this->adapter = $this->prophesize(AdapterInterface::class);
+-    $this->cacheAdapter = new DrupalCacheAdapter(static::SCHEME, $this->adapter->reveal(), $this->cacheItemBackend);
+-  }
+-
+-  /**
+-   * Tests creating a public file.
+-   */
+-  public function testWriteSuccess() {
+-    $config = new Config();
+-    $this->adapter
+-      ->write(static::FILE, 'contents', $config)
+-      ->willReturn(['visibility' => 'public']);
+-
+-    $metadata = $this->cacheAdapter->write(static::FILE, 'contents', $config);
+-    $this->assertSame('public', $metadata['visibility']);
+-    $this->assertSame('public', $this->cacheAdapter->getVisibility(static::FILE)['visibility']);
+-    $this->assertTrue($this->cacheItemBackend->has(static::FILE));
+-  }
+-
+-  /**
+-   * Tests creating a public file stream.
+-   */
+-  public function testWriteStreamSuccess() {
+-    $config = new Config();
+-    $stream = fopen('data:text/plain,contents', 'rb');
+-
+-    $this->adapter
+-      ->writeStream(static::FILE, $stream, $config)
+-      ->willReturn(['timestamp' => 12345]);
+-
+-    $metadata = $this->cacheAdapter->writeStream(static::FILE, $stream, $config);
+-    $this->assertSame(12345, $metadata['timestamp']);
+-    $this->assertSame(12345, $this->cacheAdapter->getTimestamp(static::FILE)['timestamp']);
+-    $this->assertTrue($this->cacheItemBackend->has(static::FILE));
+-  }
+-
+-  /**
+-   * Tests public file updates.
+-   */
+-  public function testUpdateSuccess() {
+-    $config = new Config();
+-    $this->adapter
+-      ->update(static::FILE, 'contents', $config)
+-      ->willReturn(['visibility' => 'public']);
+-
+-    $metadata = $this->cacheAdapter->update(static::FILE, 'contents', $config);
+-    $this->assertSame('public', $metadata['visibility']);
+-    $this->assertSame('public', $this->cacheAdapter->getVisibility(static::FILE)['visibility']);
+-  }
+-
+-  /**
+-   * Tests public file stream updates.
+-   */
+-  public function testUpdateStreamSuccess() {
+-    $config = new Config();
+-    $stream = fopen('data:text/plain,contents', 'rb');
+-
+-    $this->adapter
+-      ->updateStream(static::FILE, $stream, $config)
+-      ->willReturn(['mimetype' => 'test_mimetype']);
+-
+-    $metadata = $this->cacheAdapter->updateStream(static::FILE, $stream, $config);
+-    $this->assertSame('test_mimetype', $metadata['mimetype']);
+-    $this->assertSame('test_mimetype', $this->cacheAdapter->getMimetype(static::FILE)['mimetype']);
+-    $this->assertTrue($this->cacheItemBackend->has(static::FILE));
+-  }
+-
+-  /**
+-   * Tests renaming a file.
+-   */
+-  public function testRenameSuccess() {
+-    $config = new Config();
+-    $this->adapter
+-      ->write(static::FILE, 'contents', $config)
+-      ->willReturn(['size' => 1234]);
+-
+-    $this->cacheAdapter->write(static::FILE, 'contents', $config);
+-
+-    $this->adapter
+-      ->rename(static::FILE, 'new.txt')
+-      ->willReturn(TRUE);
+-
+-    $this->assertTrue($this->cacheAdapter->rename(static::FILE, 'new.txt'));
+-    $this->assertSame(1234, $this->cacheAdapter->getSize('new.txt')['size']);
+-
+-    $this->assertFalse($this->cacheItemBackend->has(static::FILE));
+-    $this->assertTrue($this->cacheItemBackend->has('new.txt'));
+-
+-  }
+-
+-  /**
+-   * Tests copying a file.
+-   */
+-  public function testCopySuccess() {
+-    $config = new Config();
+-    $this->adapter
+-      ->write(static::FILE, 'contents', $config)
+-      ->willReturn(['size' => 1234]);
+-
+-    $this->cacheAdapter->write(static::FILE, 'contents', $config);
+-
+-    $this->adapter->copy(static::FILE, 'new.txt')->willReturn(TRUE);
+-
+-    $this->assertTrue($this->cacheAdapter->copy(static::FILE, 'new.txt'));
+-
+-    $this->assertSame(1234, $this->cacheAdapter->getSize(static::FILE)['size']);
+-    $this->assertSame(1234, $this->cacheAdapter->getSize('new.txt')['size']);
+-    $this->assertTrue($this->cacheItemBackend->has(static::FILE));
+-    $this->assertTrue($this->cacheItemBackend->has('new.txt'));
+-  }
+-
+-  /**
+-   * Tests deleting a file.
+-   */
+-  public function testDeleteSuccess() {
+-    $config = new Config();
+-    $this->adapter
+-      ->write(static::FILE, 'contents', $config)
+-      ->willReturn(['size' => 1234]);
+-
+-    $this->cacheAdapter->write(static::FILE, 'contents', $config);
+-
+-    $this->adapter->delete(static::FILE)->willReturn(TRUE);
+-
+-    $this->assertTrue($this->cacheAdapter->delete(static::FILE));
+-    $this->assertFalse($this->cacheItemBackend->has(static::FILE));
+-  }
+-
+-  /**
+-   * Tests deleting a file directory.
+-   */
+-  public function testDeleteDirSuccess() {
+-    $config = new Config();
+-    // Create a directory with one sub file.
+-    $this->adapter->createDir('testdir', $config)->willReturn(['type' => 'dir']);
+-    $this->adapter->write('testdir/test.txt', 'contents', $config)
+-      ->willReturn(['size' => 1234]);
+-    $this->adapter->deleteDir('testdir')->willReturn(TRUE);
+-    $this->adapter->listContents('testdir', TRUE)->willReturn([
+-      ['path' => 'testdir'],
+-      ['path' => 'testdir/test.txt'],
+-    ]);
+-
+-    $this->cacheAdapter->createDir('testdir', $config);
+-    $this->cacheAdapter->write('testdir/test.txt', 'contents', $config);
+-
+-    $this->assertTrue($this->cacheAdapter->deleteDir('testdir'));
+-
+-    $this->assertFalse($this->cacheItemBackend->has('testdir/test.txt'));
+-    $this->assertFalse($this->cacheItemBackend->has('testdir'));
+-  }
+-
+-  /**
+-   * Tests visibility checking on private files.
+-   */
+-  public function testSetVisibilitySuccess() {
+-    $this->adapter
+-      ->setVisibility(static::FILE, 'private')
+-      ->willReturn(['visibility' => 'private']);
+-
+-    $metadata = $this->cacheAdapter->setVisibility(static::FILE, 'private');
+-    $this->assertSame('private', $metadata['visibility']);
+-    $this->assertSame('private', $this->cacheAdapter->getVisibility(static::FILE)['visibility']);
+-    $this->assertTrue($this->cacheItemBackend->has(static::FILE));
+-  }
+-
+-  /**
+-   * Tests file loading success.
+-   */
+-  public function testHasSuccess() {
+-    $cache_item = $this->cacheItemBackend->load(static::FILE);
+-    $this->cacheItemBackend->set(static::FILE, $cache_item);
+-    $this->assertTrue($this->cacheAdapter->has(static::FILE));
+-  }
+-
+-  /**
+-   * Tests file loading failure.
+-   */
+-  public function testHasFail() {
+-    $this->adapter->has(static::FILE)->willReturn(TRUE);
+-    $this->assertTrue($this->cacheAdapter->has(static::FILE));
+-  }
+-
+-  /**
+-   * Tests reading a file.
+-   */
+-  public function testRead() {
+-    $this->adapter->read(static::FILE)->willReturn(TRUE);
+-    $this->assertTrue($this->cacheAdapter->read(static::FILE));
+-  }
+-
+-  /**
+-   * Tests reading a stream.
+-   */
+-  public function testReadStream() {
+-    $this->adapter->readStream(static::FILE)->willReturn(TRUE);
+-    $this->assertTrue($this->cacheAdapter->readStream(static::FILE));
+-  }
+-
+-  /**
+-   * Tests listing contents of a directory.
+-   */
+-  public function testListContentsSuccess() {
+-    $this->adapter->listContents('testdir', TRUE)->willReturn(TRUE);
+-    $this->assertTrue($this->cacheAdapter->listContents('testdir', TRUE));
+-  }
+-
+-  /**
+-   * Tests retrieving file metadata.
+-   */
+-  public function testGetMetadataSuccess() {
+-    $cache_item = $this->cacheItemBackend->load(static::FILE);
+-    $cache_item->updateMetadata(['type' => 'dir']);
+-    $this->cacheItemBackend->set(static::FILE, $cache_item);
+-
+-    $this->assertSame('dir', $this->cacheAdapter->getMetadata(static::FILE)['type']);
+-  }
+-
+-  /**
+-   * Tests failing to retrieve file metadata.
+-   */
+-  public function testGetMetadataFail() {
+-    $this->adapter->getMetadata(static::FILE)->willReturn(['type' => 'dir']);
+-
+-    $this->assertSame('dir', $this->cacheAdapter->getMetadata(static::FILE)['type']);
+-  }
+-
+-  /**
+-   * Tests failing to retrieve file size.
+-   */
+-  public function testGetSizeFail() {
+-    $this->adapter->getSize(static::FILE)->willReturn(['size' => 123]);
+-
+-    $this->assertSame(123, $this->cacheAdapter->getSize(static::FILE)['size']);
+-  }
+-
+-}
+diff --git a/tests/src/Unit/Flysystem/Adapter/MissingAdapterTest.php b/tests/src/Unit/Flysystem/Adapter/MissingAdapterTest.php
+deleted file mode 100644
+index 7bae52f..0000000
+--- a/tests/src/Unit/Flysystem/Adapter/MissingAdapterTest.php
++++ /dev/null
+@@ -1,42 +0,0 @@
+-<?php
+-
+-namespace Drupal\Tests\flysystem\Unit\Flysystem\Adapter;
+-
+-use Drupal\flysystem\Flysystem\Adapter\MissingAdapter;
+-use Drupal\Tests\UnitTestCase;
+-use League\Flysystem\Config;
+-
+-/**
+- * @coversDefaultClass \Drupal\flysystem\Flysystem\Adapter\MissingAdapter
+- * @group flysystem
+- */
+-class MissingAdapterTest extends UnitTestCase {
+-
+-  /**
+-   * @covers \Drupal\flysystem\Flysystem\Adapter\MissingAdapter
+-   */
+-  public function test() {
+-    $adapter = new MissingAdapter();
+-
+-    $this->assertFalse($adapter->copy('', ''));
+-    $this->assertFalse($adapter->createDir('', new Config()));
+-    $this->assertFalse($adapter->delete(''));
+-    $this->assertFalse($adapter->deleteDir(''));
+-    $this->assertIsArray($adapter->listContents(''));
+-    $this->assertFalse($adapter->getMetadata(''));
+-    $this->assertFalse($adapter->getMimetype(''));
+-    $this->assertFalse($adapter->getSize(''));
+-    $this->assertFalse($adapter->getTimestamp(''));
+-    $this->assertFalse($adapter->getVisibility(''));
+-    $this->assertFalse($adapter->has(''));
+-    $this->assertFalse($adapter->setVisibility('', 'public'));
+-    $this->assertFalse($adapter->update('', '', new Config()));
+-    $this->assertFalse($adapter->updateStream('', NULL, new Config()));
+-    $this->assertFalse($adapter->read(''));
+-    $this->assertFalse($adapter->readStream(''));
+-    $this->assertFalse($adapter->rename('', ''));
+-    $this->assertFalse($adapter->write('', '', new Config()));
+-    $this->assertFalse($adapter->writeStream('', NULL, new Config()));
+-  }
+-
+-}
+diff --git a/tests/src/Unit/Flysystem/FtpTest.php b/tests/src/Unit/Flysystem/FtpTest.php
+deleted file mode 100644
+index a4063b4..0000000
+--- a/tests/src/Unit/Flysystem/FtpTest.php
++++ /dev/null
+@@ -1,125 +0,0 @@
+-<?php
+-
+-namespace Drupal\Tests\flysystem\Unit\Flysystem {
+-
+-  use Drupal\Core\Logger\RfcLogLevel;
+-  use Drupal\flysystem\Flysystem\Adapter\MissingAdapter;
+-  use Drupal\flysystem\Flysystem\Ftp;
+-  use Drupal\Tests\UnitTestCase;
+-  use League\Flysystem\Adapter\Ftp as LeagueFtp;
+-
+-  /**
+-   * @coversDefaultClass \Drupal\flysystem\Flysystem\Ftp
+-   * @group flysystem
+-   */
+-  class FtpTest extends UnitTestCase {
+-
+-    /**
+-     * {@inheritdoc}
+-     */
+-    public function setUp(): void {
+-      parent::setUp();
+-      if (!defined('FTP_BINARY')) {
+-        $this->markTestSkipped('The FTP_BINARY constant is not defined.');
+-      }
+-    }
+-
+-    /**
+-     * @covers ::getAdapter
+-     * @covers ::__construct
+-     */
+-    public function testGetAdapterSuccess() {
+-      $plugin = new Ftp(['host' => 'success']);
+-      $this->assertInstanceOf(LeagueFtp::class, $plugin->getAdapter());
+-    }
+-
+-    /**
+-     * @covers ::getAdapter
+-     * @covers ::__construct
+-     */
+-    public function testGetAdapterFails() {
+-      $plugin = new Ftp([]);
+-      $this->assertInstanceOf(MissingAdapter::class, $plugin->getAdapter());
+-    }
+-
+-    /**
+-     * @covers ::ensure
+-     */
+-    public function testEnsureReturnsNoErrorsOnSuccess() {
+-      $result = (new Ftp(['host' => 'success']))->ensure();
+-
+-      $this->assertCount(1, $result);
+-      $this->assertSame(RfcLogLevel::INFO, $result[0]['severity']);
+-    }
+-
+-    /**
+-     * @covers ::ensure
+-     */
+-    public function testEnsureReturnsErrors() {
+-      $plugin = new Ftp([]);
+-      $result = $plugin->ensure();
+-      $this->assertCount(1, $result);
+-      $this->assertSame(21, $result[0]['context']['%port']);
+-    }
+-
+-  }
+-}
+-
+-namespace League\Flysystem\Adapter {
+-
+-  /**
+-   * Stubs ftp_chdir().
+-   */
+-  function ftp_chdir() {
+-    return TRUE;
+-  }
+-
+-  /**
+-   * Stubs ftp_close().
+-   */
+-  function ftp_close() {
+-  }
+-
+-  /**
+-   * Stubs ftp_connect().
+-   */
+-  function ftp_connect($host) {
+-    return $host === 'success';
+-  }
+-
+-  /**
+-   * Stubs ftp_login().
+-   */
+-  function ftp_login() {
+-    return TRUE;
+-  }
+-
+-  /**
+-   * Stubs ftp_pasv().
+-   */
+-  function ftp_pasv() {
+-    return TRUE;
+-  }
+-
+-  /**
+-   * Stubs ftp_pwd().
+-   */
+-  function ftp_pwd() {
+-    return '';
+-  }
+-
+-  /**
+-   * Stubs ftp_systype().
+-   */
+-  function ftp_systype() {
+-    return TRUE;
+-  }
+-
+-  /**
+-   * Stubs ftp_raw().
+-   */
+-  function ftp_raw() {
+-    return ['200'];
+-  }
+-
+-}
+diff --git a/tests/src/Unit/Flysystem/LocalTest.php b/tests/src/Unit/Flysystem/LocalTest.php
+deleted file mode 100644
+index 233f8b3..0000000
+--- a/tests/src/Unit/Flysystem/LocalTest.php
++++ /dev/null
+@@ -1,147 +0,0 @@
+-<?php
+-
+-namespace Drupal\Tests\flysystem\Unit\Flysystem;
+-
+-use Drupal\Core\DependencyInjection\ContainerBuilder;
+-use Drupal\Core\Logger\RfcLogLevel;
+-use Drupal\Core\Routing\UrlGeneratorInterface;
+-use Drupal\Core\Site\Settings;
+-use Drupal\flysystem\Flysystem\Adapter\MissingAdapter;
+-use Drupal\flysystem\Flysystem\Local;
+-use Drupal\Tests\UnitTestCase;
+-use League\Flysystem\Adapter\Local as LocalAdapter;
+-use Prophecy\Argument;
+-
+-/**
+- * @coversDefaultClass \Drupal\flysystem\Flysystem\Local
+- * @group flysystem
+- */
+-class LocalTest extends UnitTestCase {
+-
+-  /**
+-   * {@inheritdoc}
+-   */
+-  public function setUp(): void {
+-    parent::setUp();
+-    $GLOBALS['base_url'] = 'http://example.com';
+-
+-    $container = new ContainerBuilder();
+-    $url_generator = $this->prophesize(UrlGeneratorInterface::class);
+-    $url_generator->generateFromRoute(Argument::cetera())->willReturn('download');
+-    $container->set('url_generator', $url_generator->reveal());
+-    \Drupal::setContainer($container);
+-    (new LocalAdapter('foo/bar'))->deleteDir('');
+-    @rmdir('foo/bar');
+-    @rmdir('foo');
+-    mkdir('foo');
+-    mkdir('foo/bar');
+-
+-    touch('test.txt');
+-  }
+-
+-  /**
+-   * {@inheritdoc}
+-   */
+-  public function tearDown(): void {
+-    (new LocalAdapter('foo'))->deleteDir('');
+-    @rmdir('foo');
+-
+-    unlink('test.txt');
+-
+-    @unlink('does_not_exist/.htaccess');
+-    @rmdir('does_not_exist');
+-  }
+-
+-  /**
+-   * @covers ::__construct
+-   * @covers ::create
+-   */
+-  public function testCreateReturnsPlugin() {
+-    $container = new ContainerBuilder();
+-    $settings = new Settings([]);
+-    $container->set('settings', $settings);
+-
+-    $configuration = ['root' => 'foo/bar'];
+-
+-    $this->assertInstanceOf(Local::class, Local::create($container, $configuration, '', []));
+-  }
+-
+-  /**
+-   * @covers ::getAdapter
+-   * @covers ::ensureDirectory
+-   */
+-  public function testReturnsLocalAdapter() {
+-    $this->assertInstanceOf(LocalAdapter::class, (new Local('foo/bar', FALSE))->getAdapter());
+-  }
+-
+-  /**
+-   * @covers ::getAdapter
+-   * @covers ::ensureDirectory
+-   */
+-  public function testMissingAdapterReturnedWhenPathIsFile() {
+-    $this->assertInstanceOf(MissingAdapter::class, (new Local('test.txt'))->getAdapter());
+-  }
+-
+-  /**
+-   * @covers ::getExternalUrl
+-   */
+-  public function testReturnsValidLocalUrl() {
+-    $plugin = new Local('foo/bar', FALSE);
+-    $this->assertSame('download', $plugin->getExternalUrl('uri://test.html'));
+-  }
+-
+-  /**
+-   * @covers ::getExternalUrl
+-   */
+-  public function testReturnsValidExternalUrl() {
+-    $plugin = new Local('foo/bar', TRUE);
+-    $this->assertSame('http://example.com/foo/bar/test%20thing.html', $plugin->getExternalUrl('uri://test thing.html'));
+-  }
+-
+-  /**
+-   * @covers ::ensure
+-   * @covers ::ensureDirectory
+-   */
+-  public function testDirectoryIsAutoCreatedAndHtaccessIsWritten() {
+-    new Local('does_not_exist');
+-    $this->assertTrue(is_dir('does_not_exist'));
+-    $this->assertTrue(is_file('does_not_exist/.htaccess'));
+-
+-  }
+-
+-  /**
+-   * @covers ::ensure
+-   * @covers ::writeHtaccess
+-   */
+-  public function testHtaccessNotOverwritten() {
+-    file_put_contents('foo/bar/.htaccess', 'htcontent');
+-
+-    $result = (new Local('foo/bar'))->ensure();
+-
+-    $this->assertCount(1, $result);
+-    $this->assertSame(RfcLogLevel::INFO, $result[0]['severity']);
+-    $this->assertSame('htcontent', file_get_contents('foo/bar/.htaccess'));
+-  }
+-
+-  /**
+-   * @covers ::ensure
+-   * @covers ::writeHtaccess
+-   */
+-  public function testHtaccessNotOverwrittenAndFails() {
+-    mkdir('foo/bar/.htaccess', 0777, TRUE);
+-
+-    $result = (new Local('foo/bar'))->ensure(TRUE);
+-    $this->assertCount(1, $result);
+-    $this->assertSame('https://www.drupal.org/SA-CORE-2013-003', $result[0]['context']['@url']);
+-  }
+-
+-  /**
+-   * @covers ::ensure
+-   * @covers ::writeHtaccess
+-   */
+-  public function testEnsureReturnsErrorWhenCantCreateDir() {
+-    $result = (new Local('test.txt'))->ensure();
+-    $this->assertSame('test.txt', $result[0]['context']['%root']);
+-  }
+-
+-}
+diff --git a/tests/src/Unit/Flysystem/MissingTest.php b/tests/src/Unit/Flysystem/MissingTest.php
+deleted file mode 100644
+index d69a8bb..0000000
+--- a/tests/src/Unit/Flysystem/MissingTest.php
++++ /dev/null
+@@ -1,26 +0,0 @@
+-<?php
+-
+-namespace Drupal\Tests\flysystem\Unit\Flysystem;
+-
+-use Drupal\flysystem\Flysystem\Adapter\MissingAdapter;
+-use Drupal\flysystem\Flysystem\Missing;
+-use Drupal\Tests\UnitTestCase;
+-
+-/**
+- * @coversDefaultClass \Drupal\flysystem\Flysystem\Missing
+- * @group flysystem
+- */
+-class MissingTest extends UnitTestCase {
+-
+-  /**
+-   * @covers \Drupal\flysystem\Flysystem\Missing
+-   */
+-  public function test() {
+-    $plugin = new Missing([]);
+-    $this->assertInstanceOf(MissingAdapter::class, $plugin->getAdapter());
+-    $this->assertTrue(is_array($plugin->ensure()));
+-    $this->assertCount(1, $plugin->ensure());
+-    $this->assertSame('', $plugin->getExternalUrl('asdf'));
+-  }
+-
+-}
+diff --git a/tests/src/Unit/FlysystemBridgeTest.php b/tests/src/Unit/FlysystemBridgeTest.php
+deleted file mode 100644
+index 7f50bd6..0000000
+--- a/tests/src/Unit/FlysystemBridgeTest.php
++++ /dev/null
+@@ -1,123 +0,0 @@
+-<?php
+-
+-namespace Drupal\Tests\flysystem\Unit;
+-
+-use Drupal\Core\StreamWrapper\StreamWrapperInterface;
+-use Drupal\flysystem\Flysystem\Adapter\MissingAdapter;
+-use Drupal\flysystem\Flysystem\Missing;
+-use Drupal\flysystem\FlysystemBridge;
+-use Drupal\flysystem\FlysystemFactory;
+-use Drupal\Tests\UnitTestCase;
+-use League\Flysystem\Filesystem;
+-use Symfony\Component\DependencyInjection\ContainerBuilder;
+-
+-/**
+- * @coversDefaultClass \Drupal\flysystem\FlysystemBridge
+- * @group flysystem
+- */
+-class FlysystemBridgeTest extends UnitTestCase {
+-
+-  /**
+-   * Flysystem Bridge.
+-   *
+-   * @var \Drupal\flysystem\FlysystemBridge
+-   */
+-  protected $bridge;
+-
+-  /**
+-   * File system.
+-   *
+-   * @var \League\Flysystem\FilesystemInterface
+-   */
+-  protected $filesystem;
+-
+-  /**
+-   * {@inheritdoc}
+-   */
+-  public function setUp(): void {
+-    parent::setUp();
+-    $this->bridge = new FlysystemBridge();
+-    $this->bridge->setStringTranslation($this->getStringTranslationStub());
+-    $this->bridge->setUri('testscheme://file.txt');
+-
+-    $factory = $this->prophesize(FlysystemFactory::class);
+-    $factory->getPlugin('testscheme')->willReturn(new Missing());
+-
+-    $this->filesystem = new Filesystem(new MissingAdapter());
+-
+-    $factory->getFilesystem('testscheme')->willReturn($this->filesystem);
+-
+-    $factory->getSettings('testscheme')->willReturn([
+-      'name' => '',
+-      'description' => '',
+-    ]);
+-
+-    $container = new ContainerBuilder();
+-    $container->set('flysystem_factory', $factory->reveal());
+-    \Drupal::setContainer($container);
+-  }
+-
+-  /**
+-   * @covers ::getType
+-   */
+-  public function testGetTypeReturnsWriteVisible() {
+-    $this->assertSame(StreamWrapperInterface::WRITE_VISIBLE, FlysystemBridge::getType());
+-  }
+-
+-  /**
+-   * @covers ::getName
+-   */
+-  public function testGetNameFormattingCorrect() {
+-    $this->assertSame('Flysystem: testscheme', (string) $this->bridge->getName());
+-  }
+-
+-  /**
+-   * @covers ::getDescription
+-   */
+-  public function testGetDescriptionFormattingCorrect() {
+-    $this->assertSame('Flysystem: testscheme', (string) $this->bridge->getDescription());
+-  }
+-
+-  /**
+-   * @covers ::getUri
+-   * @covers ::setUri
+-   */
+-  public function testGetUriMatchesSetUri() {
+-    $this->bridge->setUri('beep://boop');
+-    $this->assertSame('beep://boop', $this->bridge->getUri());
+-  }
+-
+-  /**
+-   * @covers ::getExternalUrl
+-   * @covers ::getFactory
+-   */
+-  public function testGetExternalUrlDelegatesToPlugin() {
+-    $this->assertSame('', $this->bridge->getExternalUrl('testscheme://testfile.txt'));
+-  }
+-
+-  /**
+-   * @covers ::realpath
+-   */
+-  public function testRealpathIsFalse() {
+-    $this->assertFalse($this->bridge->realpath());
+-  }
+-
+-  /**
+-   * @covers ::dirname
+-   */
+-  public function testDirname() {
+-    $this->assertSame('testscheme://', $this->bridge->dirname());
+-    $this->assertSame('testscheme://dir://dir', $this->bridge->dirname('testscheme:///dir://dir/file.txt'));
+-  }
+-
+-  /**
+-   * @covers ::getFilesystem
+-   * @covers ::getFilesystemForScheme
+-   */
+-  public function testGetFilesystemOverridden() {
+-    $method = new \ReflectionMethod($this->bridge, 'getFilesystem');
+-    $method->setAccessible(TRUE);
+-    $this->assertSame($this->filesystem, $method->invoke($this->bridge));
+-  }
+-
+-}
+diff --git a/tests/src/Unit/FlysystemFactoryTest.php b/tests/src/Unit/FlysystemFactoryTest.php
+deleted file mode 100644
+index 5f1d73a..0000000
+--- a/tests/src/Unit/FlysystemFactoryTest.php
++++ /dev/null
+@@ -1,207 +0,0 @@
+-<?php
+-
+-namespace Drupal\Tests\flysystem\Unit;
+-
+-use Drupal\Component\Plugin\PluginManagerInterface;
+-use Drupal\Core\Cache\NullBackend;
+-use Drupal\Core\Site\Settings;
+-use Drupal\Core\StreamWrapper\StreamWrapperManager;
+-use Drupal\flysystem\Flysystem\Adapter\DrupalCacheAdapter;
+-use Drupal\flysystem\Flysystem\Adapter\MissingAdapter;
+-use Drupal\flysystem\Flysystem\Missing;
+-use Drupal\flysystem\FlysystemFactory;
+-use Drupal\flysystem\Plugin\FlysystemPluginInterface;
+-use Drupal\Tests\UnitTestCase;
+-use League\Flysystem\Adapter\NullAdapter;
+-use League\Flysystem\FilesystemInterface;
+-use League\Flysystem\Replicate\ReplicateAdapter;
+-use Prophecy\Argument;
+-use Symfony\Contracts\EventDispatcher\EventDispatcherInterface;
+-
+-/**
+- * @coversDefaultClass \Drupal\flysystem\FlysystemFactory
+- * @group flysystem
+- */
+-class FlysystemFactoryTest extends UnitTestCase {
+-
+-  /**
+-   * Backend Cache.
+-   *
+-   * @var \Drupal\Core\Cache\CacheBackendInterface
+-   */
+-  protected $cache;
+-
+-  /**
+-   * Event Dispatcher.
+-   *
+-   * @var \Symfony\Contracts\EventDispatcher\EventDispatcherInterface
+-   */
+-  protected $eventDispatcher;
+-
+-  /**
+-   * Mocked File System.
+-   *
+-   * @var \Prophecy\Prophecy\ObjectProphecy
+-   */
+-  protected $filesystem;
+-
+-  /**
+-   * Mocked Plugin.
+-   *
+-   * @var \Prophecy\Prophecy\ObjectProphecy
+-   */
+-  protected $plugin;
+-
+-  /**
+-   * Mocked Plugin Manager.
+-   *
+-   * @var \Prophecy\Prophecy\ObjectProphecy
+-   */
+-  protected $pluginManager;
+-
+-  /**
+-   * {@inheritdoc}
+-   */
+-  public function setUp(): void {
+-    parent::setUp();
+-
+-    $this->cache = new NullBackend('bin');
+-    $this->eventDispatcher = $this->createMock(EventDispatcherInterface::class);
+-
+-    $this->pluginManager = $this->prophesize(PluginManagerInterface::class);
+-    $this->plugin = $this->prophesize(FlysystemPluginInterface::class);
+-    $this->plugin->getAdapter()->willReturn(new NullAdapter());
+-
+-    $this->pluginManager->createInstance('testdriver', [])->willReturn($this->plugin->reveal());
+-    $this->pluginManager->createInstance('', [])->willReturn(new Missing());
+-
+-    $this->filesystem = $this->prophesize(StreamWrapperManager::class);
+-    $this->filesystem->isValidScheme(Argument::type('string'))->willReturn(TRUE);
+-  }
+-
+-  /**
+-   * @covers ::getFilesystem
+-   * @covers ::__construct
+-   * @covers ::getAdapter
+-   * @covers ::getSettings
+-   * @covers ::getPlugin
+-   */
+-  public function testGetFilesystemReturnsValidFilesystem() {
+-    new Settings([
+-      'flysystem' => [
+-        'testscheme' => ['driver' => 'testdriver'],
+-      ],
+-    ]);
+-
+-    $factory = $this->getFactory();
+-
+-    $this->assertInstanceOf(FilesystemInterface::class, $factory->getFilesystem('testscheme'));
+-    $this->assertInstanceOf(NullAdapter::class, $factory->getFilesystem('testscheme')->getAdapter());
+-  }
+-
+-  /**
+-   * @covers ::getFilesystem
+-   */
+-  public function testGetFilesystemReturnsMissingFilesystem() {
+-    new Settings([]);
+-    $factory = $this->getFactory();
+-    $this->assertInstanceOf(MissingAdapter::class, $factory->getFilesystem('testscheme')->getAdapter());
+-  }
+-
+-  /**
+-   * @covers ::getFilesystem
+-   * @covers ::getAdapter
+-   */
+-  public function testGetFilesystemReturnsCachedAdapter() {
+-    new Settings([
+-      'flysystem' => [
+-        'testscheme' => ['driver' => 'testdriver' , 'cache' => TRUE],
+-      ],
+-    ]);
+-
+-    $factory = $this->getFactory();
+-    $this->assertInstanceOf(DrupalCacheAdapter::class, $factory->getFilesystem('testscheme')->getAdapter());
+-  }
+-
+-  /**
+-   * @covers ::getFilesystem
+-   * @covers ::getAdapter
+-   */
+-  public function testGetFilesystemReturnsReplicateAdapter() {
+-    // Test replicate.
+-    $this->pluginManager->createInstance('wrapped', [])->willReturn($this->plugin->reveal());
+-
+-    new Settings([
+-      'flysystem' => [
+-        'testscheme' => ['driver' => 'testdriver' , 'replicate' => 'wrapped'],
+-        'wrapped' => ['driver' => 'testdriver'],
+-      ],
+-    ]);
+-
+-    $factory = $this->getFactory();
+-    $this->assertInstanceOf(ReplicateAdapter::class, $factory->getFilesystem('testscheme')->getAdapter());
+-  }
+-
+-  /**
+-   * @covers ::getSchemes
+-   * @covers ::__construct
+-   */
+-  public function testGetSchemesFiltersInvalidSchemes() {
+-    new Settings([
+-      'flysystem' => [
+-        'testscheme' => ['driver' => 'testdriver'],
+-        'invalidscheme' => ['driver' => 'testdriver'],
+-      ],
+-    ]);
+-
+-    $this->filesystem->isValidScheme('invalidscheme')->willReturn(FALSE);
+-
+-    $this->assertSame(['testscheme'], $this->getFactory()->getSchemes());
+-  }
+-
+-  /**
+-   * @covers ::getSchemes
+-   */
+-  public function testGetSchemesHandlesNoSchemes() {
+-    new Settings([]);
+-    $this->assertSame([], $this->getFactory()->getSchemes());
+-  }
+-
+-  /**
+-   * @covers ::ensure
+-   */
+-  public function testEnsureReturnsErrors() {
+-    new Settings([
+-      'flysystem' => [
+-        'testscheme' => ['driver' => 'testdriver'],
+-      ],
+-    ]);
+-
+-    $this->plugin->ensure(FALSE)->willReturn([[
+-      'severity' => 'bad',
+-      'message' => 'Something bad',
+-      'context' => [],
+-    ],
+-    ]);
+-
+-    $errors = $this->getFactory()->ensure();
+-
+-    $this->assertSame('Something bad', $errors['testscheme'][0]['message']);
+-  }
+-
+-  /**
+-   * Gets and returns the Flysystem Factory.
+-   *
+-   * @return \Drupal\flysystem\FlysystemFactory
+-   *   Flysystem Factory.
+-   */
+-  protected function getFactory() {
+-    return new FlysystemFactory(
+-      $this->pluginManager->reveal(),
+-      $this->filesystem->reveal(),
+-      $this->cache,
+-      $this->eventDispatcher
+-    );
+-  }
+-
+-}
+diff --git a/tests/src/Unit/FlysystemServiceProviderTest.php b/tests/src/Unit/FlysystemServiceProviderTest.php
+deleted file mode 100644
+index 02a16a0..0000000
+--- a/tests/src/Unit/FlysystemServiceProviderTest.php
++++ /dev/null
+@@ -1,144 +0,0 @@
+-<?php
+-
+-namespace Drupal\Tests\flysystem\Unit;
+-
+-use Drupal\Core\Asset\AssetDumper;
+-use Drupal\Core\Asset\CssCollectionOptimizer;
+-use Drupal\Core\Asset\CssOptimizer;
+-use Drupal\Core\Asset\JsCollectionOptimizer;
+-use Drupal\Core\DependencyInjection\ContainerBuilder;
+-use Drupal\Core\Site\Settings;
+-use Drupal\flysystem\Asset\AssetDumper as FlysystemAssetDumper;
+-use Drupal\flysystem\Asset\CssCollectionOptimizer as FlysystemCssCollectionOptimizer;
+-use Drupal\flysystem\Asset\CssOptimizer as FlysystemCssOptimizer;
+-use Drupal\flysystem\Asset\JsCollectionOptimizer as FlysystemJsCollectionOptimizer;
+-use Drupal\flysystem\FlysystemBridge;
+-use Drupal\flysystem\FlysystemServiceProvider;
+-use Drupal\flysystem\PathProcessor\LocalPathProcessor;
+-use Drupal\Tests\UnitTestCase;
+-
+-/**
+- * @coversDefaultClass \Drupal\flysystem\FlysystemServiceProvider
+- * @group flysystem
+- */
+-class FlysystemServiceProviderTest extends UnitTestCase {
+-
+-  /**
+-   * The container.
+-   *
+-   * @var \Symfony\Component\DependencyInjection\ContainerInterface
+-   */
+-  protected $container;
+-
+-  /**
+-   * {@inheritdoc}
+-   */
+-  public function setUp(): void {
+-    parent::setUp();
+-    $this->container = new ContainerBuilder();
+-  }
+-
+-  /**
+-   * @covers ::register
+-   */
+-  public function testNothingFailsIfContainerIsEmpty() {
+-    new Settings([]);
+-    (new FlysystemServiceProvider())->register($this->container);
+-    $this->assertFalse($this->container->has('flysystem_stream_wrapper'));
+-  }
+-
+-  /**
+-   * @covers ::register
+-   */
+-  public function testMissingDriverIsSkipped() {
+-    new Settings(['flysystem' => ['testscheme' => []]]);
+-
+-    (new FlysystemServiceProvider())->register($this->container);
+-
+-    $this->assertFalse($this->container->has('flysystem_stream_wrapper.testscheme'));
+-  }
+-
+-  /**
+-   * @covers ::register
+-   */
+-  public function testValidSchemeConfiguration() {
+-    new Settings(['flysystem' => ['testscheme' => ['driver' => 'whatever']]]);
+-
+-    (new FlysystemServiceProvider())->register($this->container);
+-
+-    $this->assertTrue($this->container->has('flysystem_stream_wrapper.testscheme'));
+-    $this->assertSame(FlysystemBridge::class, $this->container->getDefinition('flysystem_stream_wrapper.testscheme')->getClass());
+-    $this->assertSame([['scheme' => 'testscheme']], $this->container->getDefinition('flysystem_stream_wrapper.testscheme')->getTag('stream_wrapper'));
+-  }
+-
+-  /**
+-   * @covers ::register
+-   */
+-  public function testLocalRouteProviderGetsAdded() {
+-    new Settings([
+-      'flysystem' => [
+-        'testscheme' => [
+-          'driver' => 'local',
+-          'config' => ['public' => TRUE],
+-        ],
+-      ],
+-    ]);
+-
+-    (new FlysystemServiceProvider())->register($this->container);
+-    $this->assertSame(LocalPathProcessor::class, $this->container->getDefinition('flysystem.testscheme.path_processor')->getClass());
+-  }
+-
+-  /**
+-   * @covers \Drupal\flysystem\FlysystemServiceProvider
+-   */
+-  public function test() {
+-    // Test swapping the asset dumper.
+-    $this->container->register('asset.js.dumper', AssetDumper::class);
+-    (new FlysystemServiceProvider())->register($this->container);
+-    $this->assertSame(AssetDumper::class, $this->container->getDefinition('asset.js.dumper')->getClass());
+-
+-    $this->container->register('asset.js.collection_optimizer', JsCollectionOptimizer::class);
+-    (new FlysystemServiceProvider())->register($this->container);
+-    $this->assertSame(AssetDumper::class, $this->container->getDefinition('asset.js.dumper')->getClass());
+-    $this->assertSame(JsCollectionOptimizer::class, $this->container->getDefinition('asset.js.collection_optimizer')->getClass());
+-
+-    // A successful swap.
+-    new Settings([
+-      'flysystem' => [
+-        'testscheme' => [
+-          'driver' => 'whatever',
+-          'serve_js' => TRUE,
+-        ],
+-      ],
+-    ]);
+-    (new FlysystemServiceProvider())->register($this->container);
+-    $this->assertSame(FlysystemAssetDumper::class, $this->container->getDefinition('asset.js.dumper')->getClass());
+-    $this->assertSame(FlysystemJsCollectionOptimizer::class, $this->container->getDefinition('asset.js.collection_optimizer')->getClass());
+-  }
+-
+-  /**
+-   * @covers \Drupal\flysystem\FlysystemServiceProvider
+-   */
+-  public function testSwappingCssServices() {
+-    // Test swapping the asset dumper.
+-    $this->container->register('asset.css.dumper', AssetDumper::class);
+-    $this->container->register('asset.css.collection_optimizer', CssCollectionOptimizer::class);
+-    $this->container->register('asset.css.optimizer', CssOptimizer::class);
+-
+-    new Settings([
+-      'flysystem' => [
+-        'testscheme' => [
+-          'driver' => 'whatever',
+-          'serve_css' => TRUE,
+-        ],
+-      ],
+-    ]);
+-
+-    (new FlysystemServiceProvider())->register($this->container);
+-
+-    $this->assertSame(FlysystemAssetDumper::class, $this->container->getDefinition('asset.css.dumper')->getClass());
+-    $this->assertSame(FlysystemCssCollectionOptimizer::class, $this->container->getDefinition('asset.css.collection_optimizer')->getClass());
+-    $this->assertSame(FlysystemCssOptimizer::class, $this->container->getDefinition('asset.css.optimizer')->getClass());
+-  }
+-
+-}
+diff --git a/tests/src/Unit/Form/ConfigFormTest.php b/tests/src/Unit/Form/ConfigFormTest.php
+deleted file mode 100644
+index 54f77fe..0000000
+--- a/tests/src/Unit/Form/ConfigFormTest.php
++++ /dev/null
+@@ -1,300 +0,0 @@
+-<?php
+-
+-namespace Drupal\Tests\flysystem\Unit\Form {
+-
+-  use Drupal\Core\Form\FormState;
+-  use Drupal\Core\Logger\LoggerChannelFactoryInterface;
+-  use Drupal\Core\Messenger\MessengerInterface;
+-  use Drupal\flysystem\FlysystemFactory;
+-  use Drupal\flysystem\Form\ConfigForm;
+-  use Drupal\Tests\UnitTestCase;
+-  use League\Flysystem\Filesystem;
+-  use League\Flysystem\FilesystemInterface;
+-  use League\Flysystem\Memory\MemoryAdapter;
+-  use Prophecy\Argument;
+-  use Psr\Log\LoggerInterface;
+-  use Symfony\Component\DependencyInjection\ContainerBuilder;
+-  use function Drupal\flysystem\Form\batch_set;
+-
+-  /**
+-   * @coversDefaultClass \Drupal\flysystem\Form\ConfigForm
+-   * @group flysystem
+-   */
+-  class ConfigFormTest extends UnitTestCase {
+-
+-    /**
+-     * The Flysystem factory prophecy.
+-     *
+-     * @var \Prophecy\Prophecy\ObjectProphecy
+-     */
+-    protected $factory;
+-
+-    /**
+-     * The form object.
+-     *
+-     * @var \Drupal\flysystem\Form\ConfigForm
+-     */
+-    protected $form;
+-
+-    /**
+-     * {@inheritdoc}
+-     */
+-    public function setUp(): void {
+-      parent::setUp();
+-
+-      $this->factory = $this->prophesize(FlysystemFactory::class);
+-      $this->factory->getFilesystem('from_empty')->willReturn(new Filesystem(new MemoryAdapter()));
+-      $this->factory->getFilesystem('to_empty')->willReturn(new Filesystem(new MemoryAdapter()));
+-      $this->factory->getSchemes()->willReturn(['from_empty', 'to_empty']);
+-
+-      $this->form = new ConfigForm($this->factory->reveal());
+-      $this->form->setStringTranslation($this->getStringTranslationStub());
+-      $messenger = $this->prophesize(MessengerInterface::class);
+-
+-      $container = new ContainerBuilder();
+-      $container->set('string_translation', $this->getStringTranslationStub());
+-      $container->set('flysystem_factory', $this->factory->reveal());
+-      $container->set('messenger', $messenger->reveal());
+-
+-      $logger = $this->prophesize(LoggerChannelFactoryInterface::class);
+-      $logger->get('flysystem')->willReturn($this->prophesize(LoggerInterface::class)->reveal());
+-      $container->set('logger.factory', $logger->reveal());
+-
+-      \Drupal::setContainer($container);
+-    }
+-
+-    /**
+-     * @covers ::create
+-     * @covers ::__construct
+-     */
+-    public function testCreate() {
+-      $container = new ContainerBuilder();
+-      $container->set('flysystem_factory', $this->factory->reveal());
+-
+-      $this->assertInstanceOf(ConfigForm::class, ConfigForm::create($container));
+-    }
+-
+-    /**
+-     * @covers ::getFormId
+-     */
+-    public function testGetFormId() {
+-      $this->assertSame('flysystem_config_form', $this->form->getFormId());
+-    }
+-
+-    /**
+-     * @covers ::buildForm
+-     */
+-    public function testBuildForm() {
+-      $form = $this->form->buildForm([], new FormState());
+-      $this->assertCount(4, $form);
+-
+-      $this->assertTrue($form['sync_from']['#required']);
+-      $this->assertTrue($form['sync_to']['#required']);
+-    }
+-
+-    /**
+-     * @covers ::validateForm
+-     */
+-    public function testValidateForm() {
+-      $form_state = new FormState();
+-      $form = $this->form->buildForm([], $form_state);
+-      $form['sync_from']['#parents'] = ['sync_from'];
+-      $form['sync_to']['#parents'] = ['sync_to'];
+-
+-      $form_state->setValue('sync_from', 'from');
+-      $form_state->setValue('sync_to', 'to');
+-
+-      $this->form->validateForm($form, $form_state);
+-      $this->assertCount(0, $form_state->getErrors());
+-      $form_state->setValue('sync_to', 'from');
+-
+-      $this->form->validateForm($form, $form_state);
+-      $this->assertCount(2, $form_state->getErrors());
+-    }
+-
+-    /**
+-     * @covers ::submitForm
+-     * @covers ::getFileList
+-     */
+-    public function testSubmitForm() {
+-      $form_state = new FormState();
+-      $form = [];
+-      $form_state->setValue('sync_from', 'from_empty');
+-      $form_state->setValue('sync_to', 'to_empty');
+-
+-      $this->form->submitForm($form, $form_state);
+-      $batch = batch_set();
+-
+-      $this->assertSame(ConfigForm::class . '::finishBatch', $batch['finished']);
+-      $this->assertCount(0, $batch['operations']);
+-
+-      // Test with existing source files.
+-      $from = new Filesystem(new MemoryAdapter());
+-      $from->write('dir/test.txt', 'abcdefg');
+-      $from->write('test.txt', 'abcdefg');
+-      $this->factory->getFilesystem('from_files')->willReturn($from);
+-
+-      $form_state->setValue('sync_from', 'from_files');
+-
+-      $this->form->submitForm($form, $form_state);
+-
+-      $batch_files = array_map(function (array $operation) {
+-        return $operation[1][2];
+-      }, batch_set()['operations']);
+-
+-      $this->assertSame(['dir/test.txt', 'test.txt'], $batch_files);
+-
+-      // Test with existing destination files, and force true.
+-      $form_state->setValue('force', TRUE);
+-      $form_state->setValue('sync_to', 'from_files');
+-
+-      $this->form->submitForm($form, $form_state);
+-
+-      $batch_files = array_map(function (array $operation) {
+-        return $operation[1][2];
+-      }, batch_set()['operations']);
+-
+-      $this->assertSame(['dir/test.txt', 'test.txt'], $batch_files);
+-    }
+-
+-    /**
+-     * @covers ::copyFile
+-     */
+-    public function testCopyFile() {
+-      $context = [];
+-
+-      $from = new Filesystem(new MemoryAdapter());
+-      $from->write('dir/test.txt', 'abcdefg');
+-      $this->factory->getFilesystem('from_files')->willReturn($from);
+-
+-      ConfigForm::copyFile('from_files', 'to_empty', 'dir/test.txt', $context);
+-
+-      $this->assertSame('abcdefg', $this->factory->reveal()->getFilesystem('to_empty')->read('dir/test.txt'));
+-      $this->assertTrue(empty($context['results']));
+-      $this->assertSame(1, $context['finished']);
+-    }
+-
+-    /**
+-     * @covers ::copyFile
+-     */
+-    public function testCopyFileFailedRead() {
+-      // Tests failed read.
+-      $context = [];
+-      $failed_read = $this->prophesize(FilesystemInterface::class);
+-      $failed_read->readStream('does_not_exist')->willReturn(FALSE);
+-      $this->factory->getFilesystem('failed_read')->willReturn($failed_read->reveal());
+-
+-      ConfigForm::copyFile('failed_read', 'to_empty', 'does_not_exist', $context);
+-
+-      $to_files = $this->factory->reveal()->getFilesystem('to_empty')->listContents('', TRUE);
+-      $this->assertCount(0, $to_files);
+-      $this->assertCount(1, $context['results']['errors']);
+-    }
+-
+-    /**
+-     * @covers ::copyFile
+-     */
+-    public function testCopyFileFailedWrite() {
+-      $context = [];
+-
+-      $from = new Filesystem(new MemoryAdapter());
+-      $from->write('test.txt', 'abcdefg');
+-      $this->factory->getFilesystem('from_files')->willReturn($from);
+-
+-      $failed_write = $this->prophesize(FilesystemInterface::class);
+-      $failed_write->putStream(Argument::cetera())->willReturn(FALSE);
+-      $this->factory->getFilesystem('to_fail')->willReturn($failed_write);
+-
+-      ConfigForm::copyFile('from_files', 'to_fail', 'test.txt', $context);
+-
+-      $this->assertCount(1, $context['results']['errors']);
+-      $this->assertTrue(strpos($context['results']['errors'][0][0], 'could not be saved') !== FALSE);
+-    }
+-
+-    /**
+-     * @covers ::copyFile
+-     */
+-    public function testCopyFileException() {
+-      $context = [];
+-      ConfigForm::copyFile('from_empty', 'to_empty', 'does_not_exist.txt', $context);
+-      $this->assertCount(2, $context['results']['errors']);
+-      $this->assertTrue(strpos($context['results']['errors'][0][0], 'An eror occured while copying') !== FALSE);
+-      $this->assertTrue(strpos($context['results']['errors'][1], 'File not found at path') !== FALSE);
+-    }
+-
+-    /**
+-     * @covers ::finishBatch
+-     */
+-    public function testFinishBatch() {
+-      ConfigForm::finishBatch(TRUE, [], []);
+-      ConfigForm::finishBatch(FALSE, [], ['from', 'to', 'file.txt']);
+-      ConfigForm::finishBatch(TRUE, [
+-        'errors' => [
+-          'first error',
+-          [
+-            'second error', [''],
+-          ],
+-        ],
+-      ], []);
+-      // @todo refactor.
+-      $this->assertTrue(TRUE);
+-    }
+-
+-    /**
+-     * Converts a file list fron Flysystem into a list of files.
+-     *
+-     * @param array $list
+-     *   The file list from Flysystem::listContents().
+-     *
+-     * @return string[]
+-     *   A list of file paths.
+-     */
+-    protected function getFileList(array $list) {
+-      $list = array_filter($list, function (array $file) {
+-        return $file['type'] === 'file';
+-      });
+-
+-      return array_map(function (array $file) {
+-        return $file['path'];
+-      }, $list);
+-    }
+-
+-  }
+-}
+-
+-namespace Drupal\flysystem\Form {
+-
+-  /**
+-   * Override for drupal_set_message().
+-   */
+-  function drupal_set_message() {
+-  }
+-
+-  /**
+-   * Mock batch_set() for testing.
+-   */
+-  function batch_set($batch = NULL) {
+-    static $last_batch;
+-
+-    if (isset($batch)) {
+-      $last_batch = $batch;
+-    }
+-    return $last_batch;
+-  }
+-
+-  /**
+-   * Override for drupal_set_time_limit().
+-   */
+-  function drupal_set_time_limit($limit) {
+-    if ($limit !== 0) {
+-      throw new \Exception();
+-    }
+-  }
+-
+-  /**
+-   * Override for Watchdog exception().
+-   */
+-  function watchdog_exception() {
+-  }
+-
+-}
+diff --git a/tests/src/Unit/InstallFunctionsTest.php b/tests/src/Unit/InstallFunctionsTest.php
+deleted file mode 100644
+index cdbe926..0000000
+--- a/tests/src/Unit/InstallFunctionsTest.php
++++ /dev/null
+@@ -1,107 +0,0 @@
+-<?php
+-
+-namespace Drupal\Tests\flysystem\Unit;
+-
+-use Drupal\Core\Logger\RfcLogLevel;
+-use Drupal\Core\Site\Settings;
+-use Drupal\flysystem\FlysystemFactory;
+-use Drupal\Tests\UnitTestCase;
+-use Symfony\Component\DependencyInjection\ContainerBuilder;
+-use Twistor\FlysystemStreamWrapper;
+-
+-/**
+- * Tests flysystem.install functions.
+- *
+- * @group flysystem
+- */
+-class InstallFunctionsTest extends UnitTestCase {
+-
+-  /**
+-   * The Flysystem factory prophecy object.
+-   *
+-   * @var \Prophecy\Prophecy\ObjectProphecy
+-   */
+-  protected $factory;
+-
+-  /**
+-   * {@inheritdoc}
+-   */
+-  public function setUp(): void {
+-    parent::setUp();
+-
+-    if (!defined('REQUIREMENT_ERROR')) {
+-      define('REQUIREMENT_ERROR', 2);
+-    }
+-
+-    require_once dirname(dirname(dirname(__DIR__))) . '/flysystem.install';
+-
+-    $this->factory = $this->prophesize(FlysystemFactory::class);
+-
+-    $container = new ContainerBuilder();
+-    $container->set('flysystem_factory', $this->factory->reveal());
+-    $container->set('string_translation', $this->getStringTranslationStub());
+-
+-    \Drupal::setContainer($container);
+-  }
+-
+-  /**
+-   * Tests flysystem_requirements() handles update.
+-   */
+-  public function testFlysystemRequirementsHandlesUpdate() {
+-    $dependencies_exist = (int) class_exists(FlysystemStreamWrapper::class);
+-
+-    $return = flysystem_requirements('update');
+-    $this->assertCount((1 - $dependencies_exist), $return);
+-  }
+-
+-  /**
+-   * Tests flysystem_requirements() handles install.
+-   */
+-  public function testFlysystemRequirementsHandlesInstall() {
+-    $dependencies_exist = (int) class_exists(FlysystemStreamWrapper::class);
+-
+-    $return = flysystem_requirements('install');
+-    $this->assertCount((1 - $dependencies_exist), $return);
+-  }
+-
+-  /**
+-   * Tests flysystem_requirements() handles runtime.
+-   */
+-  public function testFlysystemRequirementsHandlesRuntime() {
+-    $dependencies_exist = (int) class_exists(FlysystemStreamWrapper::class);
+-
+-    $this->factory->ensure()->willReturn([
+-      'testscheme' => [
+-        [
+-          'message' => 'Test message',
+-          'context' => [],
+-          'severity' => RfcLogLevel::ERROR,
+-        ],
+-      ],
+-    ]);
+-
+-    $return = flysystem_requirements('runtime');
+-
+-    $this->assertCount((2 - $dependencies_exist), $return);
+-    $this->assertSame('Test message', (string) $return['flysystem:testscheme']['description']);
+-  }
+-
+-  /**
+-   * Tests flysystem_requirements() detects invalid schemes.
+-   */
+-  public function testFlysystemRequirementsHandlesInvalidSchemes() {
+-    new Settings(['flysystem' => ['test_scheme' => []]]);
+-    $requirements = flysystem_requirements('update');
+-
+-    $this->assertTrue(isset($requirements['flysystem_invalid_scheme']));
+-  }
+-
+-  /**
+-   * Tests flysystem_install() calls ensure().
+-   */
+-  public function testFlysystemInstallCallsEnsure() {
+-    $this->factory->ensure()->shouldBeCalled();
+-    flysystem_install();
+-  }
+-
+-}
+diff --git a/tests/src/Unit/Logger/ConvertTest.php b/tests/src/Unit/Logger/ConvertTest.php
+deleted file mode 100644
+index c885879..0000000
+--- a/tests/src/Unit/Logger/ConvertTest.php
++++ /dev/null
+@@ -1,46 +0,0 @@
+-<?php
+-
+-namespace Drupal\Tests\flysystem\Unit\Logger;
+-
+-use Drupal\Core\Logger\RfcLogLevel;
+-use Drupal\flysystem\Logger\Convert;
+-use Drupal\Tests\UnitTestCase;
+-
+-/**
+- * @coversDefaultClass \Drupal\flysystem\Logger\Convert
+- * @group flysystem
+- */
+-class ConvertTest extends UnitTestCase {
+-
+-  /**
+-   * {@inheritdoc}
+-   */
+-  public function setUp(): void {
+-    parent::setUp();
+-    $consts = [
+-      'REQUIREMENT_INFO' => -1,
+-      'REQUIREMENT_OK' => 0,
+-      'REQUIREMENT_WARNING' => 1,
+-      'REQUIREMENT_ERROR' => 2,
+-    ];
+-
+-    foreach ($consts as $const => $value) {
+-      if (!defined($const)) {
+-        define($const, $value);
+-      }
+-    }
+-  }
+-
+-  /**
+-   * @covers ::rfcToHookRequirements
+-   */
+-  public function test() {
+-    $this->assertSame(REQUIREMENT_ERROR, Convert::rfcToHookRequirements(RfcLogLevel::EMERGENCY));
+-    $this->assertSame(REQUIREMENT_ERROR, Convert::rfcToHookRequirements(RfcLogLevel::ERROR));
+-    $this->assertSame(REQUIREMENT_WARNING, Convert::rfcToHookRequirements(RfcLogLevel::WARNING));
+-    $this->assertSame(REQUIREMENT_INFO, Convert::rfcToHookRequirements(RfcLogLevel::NOTICE));
+-    $this->assertSame(REQUIREMENT_INFO, Convert::rfcToHookRequirements(RfcLogLevel::INFO));
+-    $this->assertSame(REQUIREMENT_OK, Convert::rfcToHookRequirements(RfcLogLevel::DEBUG));
+-  }
+-
+-}
+diff --git a/tests/src/Unit/ModuleFunctionsTest.php b/tests/src/Unit/ModuleFunctionsTest.php
+deleted file mode 100644
+index ce9e235..0000000
+--- a/tests/src/Unit/ModuleFunctionsTest.php
++++ /dev/null
+@@ -1,92 +0,0 @@
+-<?php
+-
+-namespace Drupal\Tests\flysystem\Unit;
+-
+-use Drupal\Core\File\MimeType\ExtensionMimeTypeGuesser;
+-use Drupal\Core\StreamWrapper\StreamWrapperManagerInterface;
+-use Drupal\flysystem\FlysystemFactory;
+-use Drupal\Tests\UnitTestCase;
+-use org\bovigo\vfs\vfsStream;
+-use Prophecy\Argument;
+-use Symfony\Component\DependencyInjection\ContainerBuilder;
+-
+-/**
+- * Tests module functions.
+- *
+- * @group flysystem
+- */
+-class ModuleFunctionsTest extends UnitTestCase {
+-
+-  /**
+-   * The Flysystem factory prophecy object.
+-   *
+-   * @var \Prophecy\Prophecy\ObjectProphecy
+-   */
+-  protected $factory;
+-
+-  /**
+-   * {@inheritdoc}
+-   */
+-  public function setUp(): void {
+-    parent::setUp();
+-    vfsStream::setup('module_file');
+-
+-    require_once dirname(dirname(dirname(__DIR__))) . '/flysystem.module';
+-
+-    $this->factory = $this->prophesize(FlysystemFactory::class);
+-    $this->factory->getSchemes()->willReturn(['vfs']);
+-
+-    $file_system_helper = $this->prophesize(StreamWrapperManagerInterface::class);
+-    $file_system_helper->isValidScheme(Argument::type('string'))->will(function ($uri) {
+-      [$scheme] = explode('://', $uri[0]);
+-      return $scheme;
+-    });
+-
+-    $guesser = $this->prophesize(ExtensionMimeTypeGuesser::class);
+-    $guesser->guessMimeType(Argument::type('string'))->willReturn('txt/flysystem');
+-
+-    $container = new ContainerBuilder();
+-    $container->set('file_system', $file_system_helper->reveal());
+-    $container->set('flysystem_factory', $this->factory->reveal());
+-    $container->set('file.mime_type.guesser.extension', $guesser->reveal());
+-
+-    \Drupal::setContainer($container);
+-  }
+-
+-  /**
+-   * Tests flysystem_cron() calls ensure.
+-   */
+-  public function testFlysystemCronCallsEnsure() {
+-    $this->factory->ensure()->shouldBeCalled();
+-    flysystem_cron();
+-  }
+-
+-  /**
+-   * Tests flysystem_rebuild() calls ensure.
+-   */
+-  public function testFlysystemRebuildCallsEnsure() {
+-    $this->factory->ensure()->shouldBeCalled();
+-    flysystem_rebuild();
+-  }
+-
+-  /**
+-   * Tests flysystem_file_download() handles valid schemes.
+-   */
+-  public function testFlysystemFileDownloadFindsValidScheme() {
+-    $success = file_put_contents('vfs://module_file/file.txt', '1234');
+-    $this->assertEquals($success, 4);
+-    $return = flysystem_file_download('vfs://module_file/file.txt');
+-
+-    $this->assertEquals(2, count($return));
+-    $this->assertSame('txt/flysystem', $return['Content-Type']);
+-    $this->assertEquals(4, $return['Content-Length']);
+-  }
+-
+-  /**
+-   * Tests flysystem_file_download() ignores invalid schemes.
+-   */
+-  public function testFlysystemFileDownloadIgnoresInvalidScheme() {
+-    $this->assertNull(flysystem_file_download('invalid://module_file/file.txt'));
+-  }
+-
+-}
+diff --git a/tests/src/Unit/PathProcessor/FlysystemPathProcessorTest.php b/tests/src/Unit/PathProcessor/FlysystemPathProcessorTest.php
+deleted file mode 100644
+index 6786151..0000000
+--- a/tests/src/Unit/PathProcessor/FlysystemPathProcessorTest.php
++++ /dev/null
+@@ -1,56 +0,0 @@
+-<?php
+-
+-namespace Drupal\Tests\flysystem\Unit\PathProcessor;
+-
+-use Drupal\flysystem\PathProcessor\FlysystemPathProcessor;
+-use Drupal\Tests\UnitTestCase;
+-use Symfony\Component\HttpFoundation\Request;
+-
+-/**
+- * @coversDefaultClass \Drupal\flysystem\PathProcessor\FlysystemPathProcessor
+- * @group flysystem
+- */
+-class FlysystemPathProcessorTest extends UnitTestCase {
+-
+-  /**
+-   * @covers ::processInbound
+-   */
+-  public function testCorrectPathsAreProccessed() {
+-    $processor = new FlysystemPathProcessor();
+-    $this->assertSame('beep', $processor->processInbound('beep', new Request()));
+-    $this->assertSame('/_flysystem/scheme', $processor->processInbound('/_flysystem/scheme', new Request()));
+-  }
+-
+-  /**
+-   * @covers ::processInbound
+-   */
+-  public function testImageStylesAreProccessed() {
+-    $request = new Request();
+-    $processor = new FlysystemPathProcessor();
+-    $this->assertSame('/_flysystem/styles/scheme/small', $processor->processInbound('/_flysystem/scheme/styles/scheme/small/image.jpg', $request));
+-    $this->assertSame($request->query->get('file'), 'image.jpg');
+-    $this->assertSame('/_flysystem/styles/scheme/small', $processor->processInbound('/_flysystem/scheme/styles/scheme/small/dir/image.jpg', $request));
+-    $this->assertSame($request->query->get('file'), 'dir/image.jpg');
+-  }
+-
+-  /**
+-   * @covers ::processInbound
+-   */
+-  public function testDownloadPathsAreProccessed() {
+-    $request = new Request();
+-    $processor = new FlysystemPathProcessor();
+-    $this->assertSame('/_flysystem/scheme', $processor->processInbound('/_flysystem/scheme/file.txt', $request));
+-    $this->assertSame('file.txt', $request->query->get('file'));
+-  }
+-
+-  /**
+-   * @covers ::processInbound
+-   */
+-  public function testDownloadPathsInSubDirsAreProccessed() {
+-    $request = new Request();
+-    $processor = new FlysystemPathProcessor();
+-    $this->assertSame('/_flysystem/scheme', $processor->processInbound('/_flysystem/scheme/a/b/c/file.txt', $request));
+-    $this->assertSame('a/b/c/file.txt', $request->query->get('file'));
+-  }
+-
+-}
+diff --git a/tests/src/Unit/PathProcessor/LocalPathProcessorTest.php b/tests/src/Unit/PathProcessor/LocalPathProcessorTest.php
+deleted file mode 100644
+index 9cd9e1e..0000000
+--- a/tests/src/Unit/PathProcessor/LocalPathProcessorTest.php
++++ /dev/null
+@@ -1,74 +0,0 @@
+-<?php
+-
+-namespace Drupal\Tests\flysystem\Unit\PathProcessor;
+-
+-use Drupal\Core\Site\Settings;
+-use Drupal\flysystem\PathProcessor\LocalPathProcessor;
+-use Drupal\Tests\UnitTestCase;
+-use Symfony\Component\HttpFoundation\Request;
+-
+-/**
+- * @coversDefaultClass \Drupal\flysystem\PathProcessor\LocalPathProcessor
+- * @group flysystem
+- */
+-class LocalPathProcessorTest extends UnitTestCase {
+-
+-  /**
+-   * Inbound Path processor.
+-   *
+-   * @var \Drupal\Core\PathProcessor\InboundPathProcessorInterface
+-   */
+-  protected $processor;
+-
+-  /**
+-   * {@inheritdoc}
+-   */
+-  public function setUp(): void {
+-    parent::setUp();
+-    new Settings(
+-      [
+-        'flysystem' => [
+-          'testscheme' => [
+-            'driver' => 'local',
+-            'config' => ['root' => 'sites/default/files/flysystem'],
+-          ],
+-        ],
+-      ]);
+-    $this->processor = new LocalPathProcessor('testscheme');
+-  }
+-
+-  /**
+-   * @covers ::processInbound
+-   * @covers ::__construct
+-   */
+-  public function testProcessInboundIgnoresInvalidPaths() {
+-    $this->assertSame('beep', $this->processor->processInbound('beep', new Request()));
+-  }
+-
+-  /**
+-   * @covers ::processInbound
+-   */
+-  public function testProcessInboundHandlesImageStyles() {
+-    $request = new Request();
+-
+-    $this->assertSame('/sites/default/files/flysystem/styles/testscheme/small', $this->processor->processInbound('/sites/default/files/flysystem/styles/testscheme/small/image.jpg', $request));
+-    $this->assertSame($request->query->get('file'), 'image.jpg');
+-
+-    $this->assertSame('/sites/default/files/flysystem/styles/testscheme/small', $this->processor->processInbound('/sites/default/files/flysystem/styles/testscheme/small/dir/image.jpg', $request));
+-    $this->assertSame($request->query->get('file'), 'dir/image.jpg');
+-  }
+-
+-  /**
+-   * @covers ::processInbound
+-   */
+-  public function testProcessInboundHandlesSystemDownload() {
+-    $request = new Request();
+-
+-    $this->assertSame('/sites/default/files/flysystem', $this->processor->processInbound('/sites/default/files/flysystem/file.txt', $request));
+-    $this->assertSame('file.txt', $request->query->get('file'));
+-
+-    $this->assertSame('/sites/default/files/flysystem', $this->processor->processInbound('/sites/default/files/flysystem/a/b/c/file.txt', $request));
+-    $this->assertSame('a/b/c/file.txt', $request->query->get('file'));
+-  }
+-
+-}
+diff --git a/tests/src/Unit/Plugin/FlysystemPluginManagerTest.php b/tests/src/Unit/Plugin/FlysystemPluginManagerTest.php
+deleted file mode 100644
+index ef9f683..0000000
+--- a/tests/src/Unit/Plugin/FlysystemPluginManagerTest.php
++++ /dev/null
+@@ -1,45 +0,0 @@
+-<?php
+-
+-namespace Drupal\Tests\flysystem\Unit\Plugin;
+-
+-use Drupal\Core\Cache\MemoryBackend;
+-use Drupal\Core\Extension\ModuleHandlerInterface;
+-use Drupal\flysystem\Plugin\FlysystemPluginManager;
+-use Drupal\Tests\UnitTestCase;
+-
+-/**
+- * @coversDefaultClass \Drupal\flysystem\Plugin\FlysystemPluginManager
+- * @group flysystem
+- */
+-class FlysystemPluginManagerTest extends UnitTestCase {
+-
+-  /**
+-   * @covers \Drupal\flysystem\Plugin\FlysystemPluginManager
+-   */
+-  public function test() {
+-    $namespaces = new \ArrayObject();
+-    $cache_backend = new MemoryBackend('bin');
+-    $module_handle = $this->createMock(ModuleHandlerInterface::class);
+-
+-    $manager = new FlysystemPluginManager($namespaces, $cache_backend, $module_handle);
+-    $this->assertSame('missing', $manager->getFallbackPluginId('beep'));
+-    $this->assertIsArray($manager->getDefinitions());
+-
+-    // Test alterDefinitions().
+-    $method = new \ReflectionMethod($manager, 'alterDefinitions');
+-    $method->setAccessible(TRUE);
+-
+-    $definitions = [
+-      'test1' => ['extensions' => []],
+-      'test2' => ['extensions' => ['pdo']],
+-      'test3' => ['extensions' => ['missing_extension']],
+-    ];
+-
+-    $method->invokeArgs($manager, [&$definitions]);
+-    $this->assertCount(2, $definitions);
+-    $this->assertArrayHasKey('test1', $definitions);
+-    $this->assertArrayHasKey('test2', $definitions);
+-    $this->assertArrayNotHasKey('test3', $definitions);
+-  }
+-
+-}
+diff --git a/tests/src/Unit/Plugin/FlysystemUrlTraitTest.php b/tests/src/Unit/Plugin/FlysystemUrlTraitTest.php
+deleted file mode 100644
+index 1155d85..0000000
+--- a/tests/src/Unit/Plugin/FlysystemUrlTraitTest.php
++++ /dev/null
+@@ -1,40 +0,0 @@
+-<?php
+-
+-namespace Drupal\Tests\flysystem\Unit\Plugin;
+-
+-use Drupal\Core\DependencyInjection\ContainerBuilder;
+-use Drupal\Core\Routing\UrlGenerator;
+-use Drupal\flysystem\Plugin\FlysystemUrlTrait;
+-use Drupal\Tests\UnitTestCase;
+-
+-/**
+- * @coversDefaultClass \Drupal\flysystem\Plugin\FlysystemUrlTrait
+- * @group flysystem
+- */
+-class FlysystemUrlTraitTest extends UnitTestCase {
+-
+-  /**
+-   * @covers ::getExternalUrl
+-   * @covers ::getScheme
+-   * @covers ::getTarget
+-   */
+-  public function testGetExternalUrl() {
+-    $trait = $this->getMockForTrait(FlysystemUrlTrait::class);
+-
+-    $url_generator = $this->prophesize(UrlGenerator::class);
+-    $url_generator->generateFromRoute(
+-      'flysystem.serve',
+-      ['scheme' => 'testscheme', 'filepath' => 'dir/file.txt'],
+-      ['absolute' => TRUE],
+-      FALSE)
+-      ->willReturn('download');
+-
+-    $container = new ContainerBuilder();
+-    $container->set('url_generator', $url_generator->reveal());
+-
+-    \Drupal::setContainer($container);
+-
+-    $this->assertSame('download', $trait->getExternalUrl('testscheme://dir\file.txt'));
+-  }
+-
+-}
+diff --git a/tests/src/Unit/Plugin/ImageStyleGenerationTraitTest.php b/tests/src/Unit/Plugin/ImageStyleGenerationTraitTest.php
+deleted file mode 100644
+index dbe15db..0000000
+--- a/tests/src/Unit/Plugin/ImageStyleGenerationTraitTest.php
++++ /dev/null
+@@ -1,87 +0,0 @@
+-<?php
+-
+-namespace Drupal\Tests\flysystem\Unit\Plugin;
+-
+-use Drupal\Core\DependencyInjection\ContainerBuilder;
+-use Drupal\Core\Entity\EntityStorageInterface;
+-use Drupal\Core\Entity\EntityTypeManagerInterface;
+-use Drupal\Core\Entity\EntityTypeRepositoryInterface;
+-use Drupal\Core\Lock\LockBackendInterface;
+-use Drupal\Core\Lock\NullLockBackend;
+-use Drupal\flysystem\Plugin\ImageStyleGenerationTrait;
+-use Drupal\image\Entity\ImageStyle;
+-use Drupal\Tests\UnitTestCase;
+-use org\bovigo\vfs\vfsStream;
+-use Prophecy\Argument;
+-
+-/**
+- * @coversDefaultClass \Drupal\flysystem\Plugin\ImageStyleGenerationTrait
+- * @group flysystem
+- */
+-class ImageStyleGenerationTraitTest extends UnitTestCase {
+-
+-  /**
+-   * @covers ::generateImageStyle
+-   */
+-  public function testGenerateImageStyle() {
+-    vfsStream::setup('flysystem');
+-    touch('vfs://flysystem/foo.jpg');
+-    mkdir('vfs://flysystem/styles/pass', 0777, TRUE);
+-
+-    $container = new ContainerBuilder();
+-
+-    $image_style = $this->prophesize(ImageStyle::class);
+-    $image_style->buildUri('vfs://flysystem/foo.jpg')->willReturn('vfs://flysystem/styles/pass/foo.jpg');
+-    $image_style->buildUri('vfs://flysystem/foo.jpg.png')->willReturn('vfs://flysystem/styles/pass/foo.jpg.png');
+-    $image_style->id()->willReturn('pass');
+-    $image_style->createDerivative('vfs://flysystem/foo.jpg', 'vfs://flysystem/styles/pass/foo.jpg')->willReturn(TRUE);
+-    $image_style->createDerivative('vfs://flysystem/foo.jpg', 'vfs://flysystem/styles/pass/foo.jpg.png')->willReturn(TRUE);
+-
+-    $storage = $this->prophesize(EntityStorageInterface::class);
+-    $storage->load('pass')->willReturn($image_style->reveal());
+-    $storage->load('fail')->willReturn(FALSE);
+-
+-    $entity_type_manager = $this->prophesize(EntityTypeManagerInterface::class);
+-    $entity_tyep_repository = $this->prophesize(EntityTypeRepositoryInterface::class);
+-    $entity_tyep_repository->getEntityTypeFromClass(ImageStyle::class)->willReturn('image_style');
+-    $entity_type_manager->getStorage('image_style')->willReturn($storage->reveal());
+-
+-    $container->set('entity_type.repository', $entity_tyep_repository->reveal());
+-    $container->set('entity_type.manager', $entity_type_manager->reveal());
+-    $container->set('lock', new NullLockBackend());
+-
+-    \Drupal::setContainer($container);
+-
+-    $trait = $this->getMockForTrait(ImageStyleGenerationTrait::class);
+-
+-    $method = (new \ReflectionMethod($trait, 'generateImageStyle'))->getClosure($trait);
+-
+-    // Test invlid paths.
+-    $this->assertFalse($method('foo/bar'));
+-    $this->assertFalse($method('styles/image_style/vfs'));
+-
+-    // Test invalid image style.
+-    $this->assertFalse($method('styles/fail/vfs/flysystem/foo.jpg'));
+-
+-    // Test existing derivative.
+-    touch('vfs://flysystem/styles/pass/foo.jpg');
+-    $this->assertTrue($method('styles/pass/vfs/flysystem/foo.jpg'));
+-    unlink('vfs://flysystem/styles/pass/foo.jpg');
+-
+-    // Basic passing.
+-    $this->assertTrue($method('styles/pass/vfs/flysystem/foo.jpg'));
+-    $this->assertTrue($method('styles/pass/vfs/flysystem/foo.jpg.png'));
+-
+-    // Test failed lock.
+-    $fail_lock = $this->prophesize(LockBackendInterface::class);
+-    $fail_lock->acquire(Argument::type('string'))->willReturn(FALSE);
+-    $container->set('lock', $fail_lock->reveal());
+-    $this->assertFalse($method('styles/pass/vfs/flysystem/foo.jpg'));
+-    $container->set('lock', new NullLockBackend());
+-
+-    // Test missing source.
+-    unlink('vfs://flysystem/foo.jpg');
+-    $this->assertFalse($method('styles/pass/vfs/flysystem/foo.jpg.png'));
+-  }
+-
+-}
+diff --git a/tests/src/Unit/Routing/FlysystemRoutesTest.php b/tests/src/Unit/Routing/FlysystemRoutesTest.php
+deleted file mode 100644
+index 4d3acc9..0000000
+--- a/tests/src/Unit/Routing/FlysystemRoutesTest.php
++++ /dev/null
+@@ -1,165 +0,0 @@
+-<?php
+-
+-namespace Drupal\Tests\flysystem\Unit\Routing;
+-
+-use Drupal\Core\DependencyInjection\ContainerBuilder;
+-use Drupal\Core\Extension\ModuleHandlerInterface;
+-use Drupal\Core\Site\Settings;
+-use Drupal\Core\StreamWrapper\LocalStream;
+-use Drupal\Core\StreamWrapper\StreamWrapperManagerInterface;
+-use Drupal\flysystem\FlysystemFactory;
+-use Drupal\flysystem\Routing\FlysystemRoutes;
+-use Drupal\Tests\UnitTestCase;
+-
+-/**
+- * @coversDefaultClass \Drupal\flysystem\Routing\FlysystemRoutes
+- * @group flysystem
+- */
+-class FlysystemRoutesTest extends UnitTestCase {
+-
+-  /**
+-   * Flysystem Factory.
+-   *
+-   * @var \Drupal\flysystem\FlysystemFactory
+-   */
+-  protected $factory;
+-
+-  /**
+-   * Drupal ModuleHandler.
+-   *
+-   * @var \Drupal\Core\Extension\ModuleHandlerInterface
+-   */
+-  protected $moduleHandler;
+-
+-  /**
+-   * Flysystem routing for files.
+-   *
+-   * @var \Drupal\flysystem\Routing\FlysystemRoutes
+-   */
+-  protected $router;
+-
+-  /**
+-   * {@inheritdoc}
+-   */
+-  public function setUp(): void {
+-    parent::setUp();
+-    $container = new ContainerBuilder();
+-
+-    $stream_wrapper = $this->prophesize(LocalStream::class);
+-    $stream_wrapper->getDirectoryPath()->willReturn('sites/default/files');
+-
+-    $stream_wrapper_manager = $this->prophesize(StreamWrapperManagerInterface::class);
+-    $stream_wrapper_manager->getViaScheme('public')->willReturn($stream_wrapper->reveal());
+-
+-    $this->moduleHandler = $this->prophesize(ModuleHandlerInterface::class);
+-
+-    $factory = $this->prophesize(FlysystemFactory::class);
+-    $factory->getSchemes()->willReturn(['test']);
+-
+-    $container->set('flysystem_factory', $factory->reveal());
+-    $container->set('stream_wrapper_manager', $stream_wrapper_manager->reveal());
+-    $container->set('module_handler', $this->moduleHandler->reveal());
+-
+-    $this->router = FlysystemRoutes::create($container);
+-  }
+-
+-  /**
+-   * @covers ::__construct
+-   * @covers ::create
+-   * @covers ::routes
+-   */
+-  public function testInvalidSettingsAreSkipped() {
+-    new Settings([
+-      'flysystem' => [
+-        'invalid' => ['driver' => 'local'],
+-        'test' => ['driver' => 'local'],
+-      ],
+-    ]);
+-
+-    $this->assertSame([], $this->router->routes());
+-  }
+-
+-  /**
+-   * @covers ::routes
+-   */
+-  public function testInvalidDriversAreSkipped() {
+-    new Settings(['flysystem' => ['test' => ['driver' => 'ftp']]]);
+-
+-    $this->assertSame([], $this->router->routes());
+-  }
+-
+-  /**
+-   * @covers ::routes
+-   */
+-  public function testDriversNotPublicAreSkipped() {
+-    new Settings(['flysystem' => ['test' => ['driver' => 'local']]]);
+-
+-    $this->assertSame([], $this->router->routes());
+-  }
+-
+-  /**
+-   * @covers ::routes
+-   */
+-  public function testLocalPathSameAsPublicIsSkipped() {
+-    new Settings([
+-      'flysystem' => [
+-        'test' => [
+-          'driver' => 'local',
+-          'public' => TRUE,
+-          'config' => [
+-            'public' => TRUE,
+-            'root' => 'sites/default/files',
+-          ],
+-        ],
+-      ],
+-    ]);
+-
+-    $this->assertSame([], $this->router->routes());
+-  }
+-
+-  /**
+-   * @covers ::routes
+-   */
+-  public function testValidRoutesReturned() {
+-    new Settings([
+-      'flysystem' => [
+-        'test' => [
+-          'driver' => 'local',
+-          'public' => TRUE,
+-          'config' => [
+-            'public' => TRUE,
+-            'root' => 'sites/default/files/flysystem',
+-          ],
+-        ],
+-      ],
+-    ]);
+-
+-    $routes = $this->router->routes();
+-    $this->assertCount(1, $routes);
+-    $this->assertTrue(isset($routes['flysystem.test.serve']));
+-  }
+-
+-  /**
+-   * @covers ::routes
+-   */
+-  public function testValidRoutesReturnedWithImageModule() {
+-    new Settings([
+-      'flysystem' => [
+-        'test' => [
+-          'driver' => 'local',
+-          'public' => TRUE,
+-          'config' => [
+-            'public' => TRUE,
+-            'root' => 'sites/default/files/flysystem',
+-          ],
+-        ],
+-      ],
+-    ]);
+-
+-    $this->moduleHandler->moduleExists('image')->willReturn(TRUE);
+-    $routes = $this->router->routes();
+-    $this->assertCount(3, $routes);
+-    $this->assertTrue(isset($routes['flysystem.image_style']));
+-  }
+-
+-}
+diff --git a/tests/src/Unit/SerializationStopperTraitTest.php b/tests/src/Unit/SerializationStopperTraitTest.php
+deleted file mode 100644
+index 71a242a..0000000
+--- a/tests/src/Unit/SerializationStopperTraitTest.php
++++ /dev/null
+@@ -1,24 +0,0 @@
+-<?php
+-
+-namespace Drupal\Tests\flysystem\Unit;
+-
+-use Drupal\flysystem\SerializationStopperTrait;
+-use Drupal\Tests\UnitTestCase;
+-
+-/**
+- * @coversDefaultClass \Drupal\flysystem\SerializationStopperTrait
+- * @group flysystem
+- */
+-class SerializationStopperTraitTest extends UnitTestCase {
+-
+-  /**
+-   * @covers ::__sleep
+-   */
+-  public function test() {
+-    $this->expectException(\LogicException::class);
+-    $this->expectExceptionMessage('can not be serialized.');
+-    $trait = $this->getMockForTrait(SerializationStopperTrait::class);
+-    serialize($trait);
+-  }
+-
+-}
