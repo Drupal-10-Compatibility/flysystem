@@ -32,6 +32,7 @@
         "drupal/core-dev": "^10.2",
         "league/flysystem-memory": "^1.0",
         "phpcompatibility/php-compatibility": "8.1.0",
+        "phpspec/prophecy": "~1.0",
         "phpstan/phpstan-deprecation-rules": "^1.0"
     },
     "conflict": {
@@ -120,7 +121,8 @@
                 "Fixing php 8.2 compatibility issue swith php-compatibility-sniffer":"patches/php-compatibility-sniffer-8.1-patch.patch"
             },
             "drupal/flysystem": {
-                "coding-standards-d10.4-php8.2": "patches/coding-standards-static-analyze-1.patch"
+                "coding-standards-d10.4-php8.2": "patches/coding-standards-static-analyze-1.patch",
+                "unit-test-patches": "patches/unit-tests.patch"
             }
         }
     },

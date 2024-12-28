@@ -1,0 +1,66 @@
+diff --git a/tests/src/Kernel/CollectionOptimizerTest.php b/tests/src/Kernel/CollectionOptimizerTest.php
+index 9fb14f7..71e1154 100644
+--- a/tests/src/Kernel/CollectionOptimizerTest.php
++++ b/tests/src/Kernel/CollectionOptimizerTest.php
+@@ -32,12 +32,20 @@ class CollectionOptimizerTest extends KernelTestBase {
+    */
+   protected $fileUrlGenerator;
+ 
++  /**
++   * Flysystem Logger channel.
++   *
++   * @var \Psr\Log\LoggerInterface
++   **/
++  protected $loggerChannel;
++
+   /**
+    * {@inheritdoc}
+    */
+   public function setUp(): void {
+     parent::setUp();
+     $this->fileUrlGenerator = $this->container->get('file_url_generator');
++    $this->logger = $this->container->get('logger.factory')->get('flysystem');
+     $this->cleanUp();
+   }
+ 
+@@ -76,7 +84,7 @@ class CollectionOptimizerTest extends KernelTestBase {
+     $dumper = $this->prophesize(AssetDumper::class);
+     $state = $this->prophesize(StateInterface::class);
+ 
+-    $optimizer = new JsCollectionOptimizer($grouper->reveal(), new JsOptimizer(), $dumper->reveal(), $state->reveal(), $this->container->get('file_system'));
++    $optimizer = new JsCollectionOptimizer($grouper->reveal(), new JsOptimizer($this->loggerChannel), $dumper->reveal(), $state->reveal(), $this->container->get('file_system'));
+     $optimizer->deleteAll();
+ 
+     foreach ($this->jsFilesUnderTest() as $js_file => $expired) {
+diff --git a/tests/src/Unit/Plugin/FlysystemPluginManagerTest.php b/tests/src/Unit/Plugin/FlysystemPluginManagerTest.php
+index ef9f683..78e787d 100644
+--- a/tests/src/Unit/Plugin/FlysystemPluginManagerTest.php
++++ b/tests/src/Unit/Plugin/FlysystemPluginManagerTest.php
+@@ -6,6 +6,7 @@ use Drupal\Core\Cache\MemoryBackend;
+ use Drupal\Core\Extension\ModuleHandlerInterface;
+ use Drupal\flysystem\Plugin\FlysystemPluginManager;
+ use Drupal\Tests\UnitTestCase;
++use Drupal\Component\Datetime\TimeInterface;
+ 
+ /**
+  * @coversDefaultClass \Drupal\flysystem\Plugin\FlysystemPluginManager
+@@ -17,8 +18,9 @@ class FlysystemPluginManagerTest extends UnitTestCase {
+    * @covers \Drupal\flysystem\Plugin\FlysystemPluginManager
+    */
+   public function test() {
++    $time = this->createMock(TimeInterface::class);
+     $namespaces = new \ArrayObject();
+-    $cache_backend = new MemoryBackend('bin');
++    $cache_backend = new MemoryBackend($time);
+     $module_handle = $this->createMock(ModuleHandlerInterface::class);
+ 
+     $manager = new FlysystemPluginManager($namespaces, $cache_backend, $module_handle);
+@@ -35,7 +37,7 @@ class FlysystemPluginManagerTest extends UnitTestCase {
+       'test3' => ['extensions' => ['missing_extension']],
+     ];
+ 
+-    $method->invokeArgs($manager, [&$definitions]);
++    $method->invokeArgs($manager, [$definitions]);
+     $this->assertCount(2, $definitions);
+     $this->assertArrayHasKey('test1', $definitions);
+     $this->assertArrayHasKey('test2', $definitions);
