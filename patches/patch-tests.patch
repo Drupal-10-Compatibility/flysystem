@@ -165,3 +165,16 @@ index 94750bb..0000000
 -  }
 -
 -}
+diff --git a/tests/src/Unit/Plugin/FlysystemPluginManagerTest.php b/tests/src/Unit/Plugin/FlysystemPluginManagerTest.php
+index 84a93af..8687cde 100644
+--- a/tests/src/Unit/Plugin/FlysystemPluginManagerTest.php
++++ b/tests/src/Unit/Plugin/FlysystemPluginManagerTest.php
+@@ -38,7 +38,7 @@ class FlysystemPluginManagerTest extends UnitTestCase {
+       'test3' => ['extensions' => ['missing_extension']],
+     ];
+ 
+-    $method->invokeArgs($manager, [&$definitions]);
++    $method->invokeArgs($manager, [&$definitions]); // phpcs:ignore
+     $this->assertCount(2, $definitions);
+     $this->assertArrayHasKey('test1', $definitions);
+     $this->assertArrayHasKey('test2', $definitions);
