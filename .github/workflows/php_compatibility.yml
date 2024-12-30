@@ -9,7 +9,7 @@ on:
   workflow_dispatch:
 jobs:
   run-unit-tests:
-    name: Check for PHP 8.2 Compatibility
+    name: Check for PHP Compatibility
     runs-on:  ubuntu-22.04
     env:
       MODULE: flysystem
@@ -42,9 +42,7 @@ jobs:
       # Create new drupal project with Composer install
       - name: Install Drupal with Composer
         run: composer update
-      - name: Check League libraries for PHP 8.2 Compatibility
-        run: $(pwd)/vendor/bin/phpcs -p ${{ env.PROJECT_ROOT }}/vendor/league --standard=PHPCompatibility --runtime-set testVersion 8.2
-      - name: Check Twistor libraries for PHP 8.2 Compatibility
-        run: $(pwd)/vendor/bin/phpcs -p ${{ env.PROJECT_ROOT }}/vendor/twistor --standard=PHPCompatibility --runtime-set testVersion 8.2
-      - name: Check Flysystem for PHP 8.2 Compatibility
-        run: $(pwd)/vendor/bin/phpcs -p ${{ env.DRUPAL_ROOT }}/modules/contrib/${{ env.MODULE }} --standard=PHPCompatibility --runtime-set testVersion 8.2
+      - name: Check League libraries for PHP ${{ env.PHP_VERSION }} Compatibility
+        run: $(pwd)/vendor/bin/phpcs -p ${{ env.PROJECT_ROOT }}/vendor/league --standard=PHPCompatibility --runtime-set testVersion ${{ env.PHP_VERSION }}
+      - name: Check Flysystem for PHP ${{ env.PHP_VERSION }} Compatibility
+        run: $(pwd)/vendor/bin/phpcs -p ${{ env.DRUPAL_ROOT }}/modules/contrib/${{ env.MODULE }} --standard=PHPCompatibility --runtime-set testVersion ${{ env.PHP_VERSION }}
