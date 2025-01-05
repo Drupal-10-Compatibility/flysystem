@@ -1,0 +1,1599 @@
+diff --git a/src/FlysystemBridge.php b/src/FlysystemBridge.php
+index 0d2f314..fd5316c 100644
+--- a/src/FlysystemBridge.php
++++ b/src/FlysystemBridge.php
+@@ -4,7 +4,6 @@ namespace Drupal\flysystem;
+ 
+ use Drupal\Core\StreamWrapper\StreamWrapperInterface;
+ use Drupal\Core\StringTranslation\StringTranslationTrait;
+-use Drupal\flysystem\StreamWrapper\Plugin\Util;
+ use Drupal\flysystem\StreamWrapper\FlysystemStreamWrapper;
+ 
+ /**
+@@ -84,7 +83,10 @@ class FlysystemBridge extends FlysystemStreamWrapper implements StreamWrapperInt
+ 
+     [$scheme, $target] = explode('://', $uri, 2);
+ 
+-    return $scheme . '://' . ltrim(Util::dirname($target), '\/');
++    $dirname = dirname($target);
++    $target = $dirname === '.' ? '' : $dirname;
++
++    return $scheme . '://' . ltrim($target, '\/');
+   }
+ 
+   /**
+diff --git a/src/Plugin/FlysystemUrlTrait.php b/src/Plugin/FlysystemUrlTrait.php
+index ee3fc99..17568dd 100644
+--- a/src/Plugin/FlysystemUrlTrait.php
++++ b/src/Plugin/FlysystemUrlTrait.php
+@@ -3,7 +3,6 @@
+ namespace Drupal\flysystem\Plugin;
+ 
+ use Drupal\Core\Url;
+-use Drupal\flysystem\StreamWrapper\Plugin\Util;
+ 
+ /**
+  * Helper trait for generating URLs from adapter plugins.
+@@ -44,7 +43,7 @@ trait FlysystemUrlTrait {
+    *   The file path of the URI.
+    */
+   protected function getTarget($uri) {
+-    return Util::normalizePath(substr($uri, strpos($uri, '://') + 3));
++    return $this->normalizeRelativePath(substr($uri, strpos($uri, '://') + 3));
+   }
+ 
+   /**
+@@ -60,4 +59,50 @@ trait FlysystemUrlTrait {
+     return substr($uri, 0, strpos($uri, '://'));
+   }
+ 
++  /**
++   * Normalize relative directories in a path.
++   *
++   * @param string $path
++   *   Path containing directories to normalize.
++   *
++   * @return string
++   *   Normalized path.
++   *
++   * @throws \LogicException
++   *
++   * @see FlysystemStreamWrapper::normalizeRelativePath()
++   */
++  protected function normalizeRelativePath($path) {
++    $path = str_replace('\\', '/', $path);
++
++    while (preg_match('#\p{C}+|^\./#u', $path)) {
++      $path = preg_replace('#\p{C}+|^\./#u', '', $path);
++    }
++
++    $parts = [];
++
++    foreach (explode('/', $path) as $part) {
++      switch ($part) {
++        case '':
++        case '.':
++          break;
++
++        case '..':
++          if (empty($parts)) {
++            throw new \LogicException(
++                  'Path is outside of the defined root, path: [' . $path . ']'
++              );
++          }
++          array_pop($parts);
++          break;
++
++        default:
++          $parts[] = $part;
++          break;
++      }
++    }
++
++    return implode('/', $parts);
++  }
++
+ }
+diff --git a/src/StreamWrapper/FlysystemStreamWrapper.php b/src/StreamWrapper/FlysystemStreamWrapper.php
+index c69f8df..ec60306 100644
+--- a/src/StreamWrapper/FlysystemStreamWrapper.php
++++ b/src/StreamWrapper/FlysystemStreamWrapper.php
+@@ -2,16 +2,16 @@
+ 
+ namespace Drupal\flysystem\StreamWrapper;
+ 
++use Drupal\flysystem\StreamWrapper\Exception\DirectoryExistsException;
++use Drupal\flysystem\StreamWrapper\Exception\DirectoryNotEmptyException;
+ use Drupal\flysystem\StreamWrapper\Exception\FileNotFoundException;
++use Drupal\flysystem\StreamWrapper\Exception\NotADirectoryException;
++use Drupal\flysystem\StreamWrapper\Exception\RootViolationException;
+ use Drupal\flysystem\StreamWrapper\Exception\TriggerErrorException;
+-use Drupal\flysystem\StreamWrapper\Plugin\ForcedRename;
+-use Drupal\flysystem\StreamWrapper\Plugin\Mkdir;
+-use Drupal\flysystem\StreamWrapper\Plugin\Rmdir;
+ use Drupal\flysystem\StreamWrapper\Plugin\Stat;
+-use Drupal\flysystem\StreamWrapper\Plugin\Touch;
+-use Drupal\flysystem\StreamWrapper\Plugin\Util;
+ use Drupal\flysystem\StreamWrapper\Util\StreamUtil;
+ use League\Flysystem\AdapterInterface;
++use League\Flysystem\Config;
+ use League\Flysystem\FilesystemInterface;
+ 
+ /**
+@@ -242,9 +242,6 @@ class FlysystemStreamWrapper {
+    *   Filesystem object.
+    */
+   protected static function registerPlugins($protocol, FilesystemInterface $filesystem) {
+-    $filesystem->addPlugin(new ForcedRename());
+-    $filesystem->addPlugin(new Mkdir());
+-    $filesystem->addPlugin(new Rmdir());
+ 
+     $stat = new Stat(
+           static::$config[$protocol]['permissions'],
+@@ -252,7 +249,6 @@ class FlysystemStreamWrapper {
+       );
+ 
+     $filesystem->addPlugin($stat);
+-    $filesystem->addPlugin(new Touch());
+   }
+ 
+   /**
+@@ -281,7 +277,7 @@ class FlysystemStreamWrapper {
+   public function dir_opendir($uri, $options) { // phpcs:ignore
+     $this->uri = $uri;
+ 
+-    $path = Util::normalizePath($this->getTarget());
++    $path = $this->normalizePath($this->getTarget());
+ 
+     $this->listing = $this->invoke($this->getFilesystem(), 'listContents', [$path], 'opendir');
+ 
+@@ -331,25 +327,6 @@ class FlysystemStreamWrapper {
+     return TRUE;
+   }
+ 
+-  /**
+-   * Creates a directory.
+-   *
+-   * @param string $uri
+-   *   URI of directory to make.
+-   * @param int $mode
+-   *   Directory mode.
+-   * @param int $options
+-   *   Create options.
+-   *
+-   * @return bool
+-   *   True on success, false on failure.
+-   */
+-  public function mkdir($uri, $mode, $options) {
+-    $this->uri = $uri;
+-
+-    return $this->invoke($this->getFilesystem(), 'mkdir', [$this->getTarget(), $mode, $options]);
+-  }
+-
+   /**
+    * Renames a file or directory.
+    *
+@@ -363,26 +340,7 @@ class FlysystemStreamWrapper {
+    */
+   public function rename($uri_from, $uri_to) {
+     $this->uri = $uri_from;
+-    $args = [$this->getTarget($uri_from), $this->getTarget($uri_to)];
+-
+-    return $this->invoke($this->getFilesystem(), 'forcedRename', $args, 'rename');
+-  }
+-
+-  /**
+-   * Removes a directory.
+-   *
+-   * @param string $uri
+-   *   Directory to remove.
+-   * @param int $options
+-   *   Options on removal action.
+-   *
+-   * @return bool
+-   *   True on success, false on failure.
+-   */
+-  public function rmdir($uri, $options) {
+-    $this->uri = $uri;
+-
+-    return $this->invoke($this->getFilesystem(), 'rmdir', [$this->getTarget(), $options]);
++    return $this->forcedRename($uri_from, $uri_to);
+   }
+ 
+   /**
+@@ -514,7 +472,7 @@ class FlysystemStreamWrapper {
+         return TRUE;
+ 
+       case STREAM_META_TOUCH:
+-        return $this->invoke($this->getFilesystem(), 'touch', [$this->getTarget()]);
++        return $this->touch($this->getTarget());
+ 
+       default:
+         return FALSE;
+@@ -1025,7 +983,7 @@ class FlysystemStreamWrapper {
+     // Normalize paths so that locks are consistent.
+     // We are using sha1() to avoid the file name limits, and case
+     // insensitivity on Windows. This is not security sensitive.
+-    $lock_key = sha1(Util::normalizePath($this->getTarget()));
++    $lock_key = sha1($this->normalizePath($this->getTarget()));
+ 
+     // Relay the lock to a real filesystem lock.
+     return fopen($temp_dir . '/' . $lock_key, 'c');
+@@ -1053,4 +1011,272 @@ class FlysystemStreamWrapper {
+     return $success;
+   }
+ 
++  /**
++   * Normalize relative directories in a path.
++   *
++   * @param string $path
++   *   Path containing directories to normalize.
++   *
++   * @return string
++   *   Normalized path.
++   *
++   * @throws \LogicException
++   */
++  protected function normalizePath($path) {
++    $path = str_replace('\\', '/', $path);
++
++    while (preg_match('#\p{C}+|^\./#u', $path)) {
++      $path = preg_replace('#\p{C}+|^\./#u', '', $path);
++    }
++
++    $parts = [];
++
++    foreach (explode('/', $path) as $part) {
++      switch ($part) {
++        case '':
++        case '.':
++          break;
++
++        case '..':
++          if (empty($parts)) {
++            throw new \LogicException(
++                  'Path is outside of the defined root, path: [' . $path . ']'
++              );
++          }
++          array_pop($parts);
++          break;
++
++        default:
++          $parts[] = $part;
++          break;
++      }
++    }
++
++    return implode('/', $parts);
++  }
++
++  /**
++   * Gets default config for Filesystem object.
++   *
++   * @return \League\Flysystem\Config
++   *   Flysystem filesystem config object.
++   */
++  protected function defaultConfig() {
++    $config = new Config();
++    $config->setFallback($this->filesystem->getConfig());
++
++    return $config;
++  }
++
++  /**
++   * Emulates touch().
++   *
++   * @param string $path
++   *   Path to file.
++   *
++   * @return bool
++   *   True on success, false on failure.
++   */
++  private function touch($path) {
++    $path = $this->normalizeRelativePath($path);
++
++    $adapter = $this->filesystem->getAdapter();
++
++    if ($adapter->has($path)) {
++      return TRUE;
++    }
++
++    return (bool) $adapter->write($path, '', $this->defaultConfig());
++  }
++
++  /**
++   * Removes a directory.
++   *
++   * @param string $dirname
++   *   Path to directory.
++   * @param int $options
++   *   Options on removal action.
++   *
++   * @return bool
++   *   True if success, False if failed.
++   *
++   * @todo refactor to change $dirname to $uri.
++   *
++   * @throws \Drupal\flysystem\StreamWrapper\Exception\DirectoryNotEmptyException
++   */
++  public function rmdir($dirname, $options) {
++    $this->uri = $dirname;
++
++    $dirname = $this->normalizeRelativePath($dirname);
++
++    if ($dirname === '') {
++      throw new RootViolationException('Root directories can not be deleted.');
++    }
++
++    $adapter = $this->filesystem->getAdapter();
++
++    if ($options & STREAM_MKDIR_RECURSIVE) {
++      // I don't know how this gets triggered.
++      return (bool) $adapter->deleteDir($dirname);
++    }
++
++    $contents = $this->filesystem->listContents($dirname);
++
++    if (!empty($contents)) {
++      throw new DirectoryNotEmptyException();
++    }
++
++    return (bool) $adapter->deleteDir($dirname);
++  }
++
++  /**
++   * Creates a directory.
++   *
++   * @param string $dirname
++   *   Directory to create.
++   * @param int $mode
++   *   Directory mode.
++   * @param int $options
++   *   Options for creation.
++   *
++   * @return bool
++   *   True on success, false on failure.
++   *
++   * @throws \Drupal\flysystem\StreamWrapper\Exception\FileNotFoundException
++   *
++   * @todo Refactor to make $dirname $uri instead.
++   */
++  public function mkdir($dirname, $mode, $options) {
++    $dirname = $this->normalizeRelativePath($dirname);
++
++    $adapter = $this->filesystem->getAdapter();
++
++    // If recursive, or a single level directory, just create it.
++    if (($options & STREAM_MKDIR_RECURSIVE) || strpos($dirname, '/') === FALSE) {
++      return (bool) $adapter->createDir($dirname, $this->defaultConfig());
++    }
++
++    if (!$adapter->has(dirname($dirname))) {
++      throw new FileNotFoundException($dirname);
++    }
++
++    return (bool) $adapter->createDir($dirname, $this->defaultConfig());
++  }
++
++  /**
++   * Renames a file.
++   *
++   * @param string $path
++   *   Path to file.
++   * @param string $newpath
++   *   New path.
++   *
++   * @return bool
++   *   TRUE if successful, FALSE if failed.
++   *
++   * @throws \Drupal\flysystem\StreamWrapper\Exception\FileNotFoundException
++   * @throws \Drupal\flysystem\StreamWrapper\Exception\DirectoryExistsException
++   * @throws \Drupal\flysystem\StreamWrapper\Exception\DirectoryNotEmptyException
++   * @throws \Drupal\flysystem\StreamWrapper\Exception\NotADirectoryException
++   */
++  public function forcedRename($path, $newpath) {
++    $path = $this->normalizeRelativePath($path);
++    $newpath = $this->normalizeRelativePath($newpath);
++
++    // Ignore useless renames.
++    if ($path === $newpath) {
++      return TRUE;
++    }
++
++    if (!$this->isValidRename($path, $newpath)) {
++      // Returns false if a Flysystem call fails.
++      return FALSE;
++    }
++
++    return (bool) $this->filesystem->getAdapter()->rename($path, $newpath);
++  }
++
++  /**
++   * Checks that a rename is valid.
++   *
++   * @param string $source
++   *   Source location of file.
++   * @param string $dest
++   *   Desination of renamed file.
++   *
++   * @return bool
++   *   True on success, False on failure.
++   *
++   * @throws \Drupal\flysystem\StreamWrapper\Exception\FileNotFoundException
++   * @throws \Drupal\flysystem\StreamWrapper\Exception\DirectoryExistsException
++   * @throws \Drupal\flysystem\StreamWrapper\Exception\DirectoryNotEmptyException
++   * @throws \Drupal\flysystem\StreamWrapper\Exception\NotADirectoryException
++   */
++  private function isValidRename($source, $dest) {
++    $adapter = $this->filesystem->getAdapter();
++
++    if (!$adapter->has($source)) {
++      throw new FileNotFoundException($source);
++    }
++
++    $dirname = dirname($dest);
++    $subdir = $dirname === '.' ? '' : $dirname;
++
++    if (strlen($subdir) && !$adapter->has($subdir)) {
++      throw new FileNotFoundException($source);
++    }
++
++    if (!$adapter->has($dest)) {
++      return TRUE;
++    }
++
++    return $this->compareTypes($source, $dest);
++  }
++
++  /**
++   * Compares the file/dir for the source and dest.
++   *
++   * @param string $source
++   *   Source of file.
++   * @param string $dest
++   *   Destination of renamed file.
++   *
++   * @return bool
++   *   True on success, False on failure.
++   *
++   * @throws \Drupal\flysystem\StreamWrapper\Exception\DirectoryExistsException
++   * @throws \Drupal\flysystem\StreamWrapper\Exception\DirectoryNotEmptyException
++   * @throws \Drupal\flysystem\StreamWrapper\Exception\NotADirectoryException
++   */
++  private function compareTypes($source, $dest) {
++    $adapter = $this->filesystem->getAdapter();
++
++    $source_type = $adapter->getMetadata($source)['type'];
++    $dest_type = $adapter->getMetadata($dest)['type'];
++
++    // These three checks are done in order of cost to minimize Flysystem
++    // calls.
++    // Don't allow overwriting different types.
++    if ($source_type !== $dest_type) {
++      if ($dest_type === 'dir') {
++        throw new DirectoryExistsException();
++      }
++
++      throw new NotADirectoryException();
++    }
++
++    // Allow overwriting destination file.
++    if ($source_type === 'file') {
++      return $adapter->delete($dest);
++    }
++
++    // Allow overwriting destination directory if not empty.
++    $contents = $this->filesystem->listContents($dest);
++    if (!empty($contents)) {
++      throw new DirectoryNotEmptyException();
++    }
++
++    return $adapter->deleteDir($dest);
++  }
++
+ }
+diff --git a/src/StreamWrapper/Plugin/AbstractPlugin.php b/src/StreamWrapper/Plugin/AbstractPlugin.php
+deleted file mode 100644
+index 218839d..0000000
+--- a/src/StreamWrapper/Plugin/AbstractPlugin.php
++++ /dev/null
+@@ -1,33 +0,0 @@
+-<?php
+-
+-namespace Drupal\flysystem\StreamWrapper\Plugin;
+-
+-use League\Flysystem\Config;
+-use League\Flysystem\Plugin\AbstractPlugin as FlysystemPlugin;
+-
+-/**
+- * Extends Flysystem Abstract Plugin.
+- */
+-abstract class AbstractPlugin extends FlysystemPlugin {
+-
+-  /**
+-   * Filesystem object.
+-   *
+-   * @var \League\Flysystem\Filesystem
+-   */
+-  protected $filesystem;
+-
+-  /**
+-   * Gets default config for Filesystem object.
+-   *
+-   * @return \League\Flysystem\Config
+-   *   Flysystem filesystem config object.
+-   */
+-  protected function defaultConfig() {
+-    $config = new Config();
+-    $config->setFallback($this->filesystem->getConfig());
+-
+-    return $config;
+-  }
+-
+-}
+diff --git a/src/StreamWrapper/Plugin/ForcedRename.php b/src/StreamWrapper/Plugin/ForcedRename.php
+deleted file mode 100644
+index 1744318..0000000
+--- a/src/StreamWrapper/Plugin/ForcedRename.php
++++ /dev/null
+@@ -1,137 +0,0 @@
+-<?php
+-
+-namespace Drupal\flysystem\StreamWrapper\Plugin;
+-
+-use Drupal\flysystem\StreamWrapper\Exception\FileNotFoundException;
+-use Drupal\flysystem\StreamWrapper\Exception\DirectoryExistsException;
+-use Drupal\flysystem\StreamWrapper\Exception\DirectoryNotEmptyException;
+-use Drupal\flysystem\StreamWrapper\Exception\NotADirectoryException;
+-
+-/**
+- * Forces rename of file.
+- */
+-class ForcedRename extends AbstractPlugin {
+-
+-  /**
+-   * {@inheritdoc}
+-   */
+-  public function getMethod() {
+-    return 'forcedRename';
+-  }
+-
+-  /**
+-   * Renames a file.
+-   *
+-   * @param string $path
+-   *   Path to file.
+-   * @param string $newpath
+-   *   New path.
+-   *
+-   * @return bool
+-   *   TRUE if successful, FALSE if failed.
+-   *
+-   * @throws \Drupal\flysystem\StreamWrapper\Exception\FileNotFoundException
+-   * @throws \Drupal\flysystem\StreamWrapper\Exception\DirectoryExistsException
+-   * @throws \Drupal\flysystem\StreamWrapper\Exception\DirectoryNotEmptyException
+-   * @throws \Drupal\flysystem\StreamWrapper\Exception\NotADirectoryException
+-   */
+-  public function handle($path, $newpath) {
+-    $path = Util::normalizePath($path);
+-    $newpath = Util::normalizePath($newpath);
+-
+-    // Ignore useless renames.
+-    if ($path === $newpath) {
+-      return TRUE;
+-    }
+-
+-    if (!$this->isValidRename($path, $newpath)) {
+-      // Returns false if a Flysystem call fails.
+-      return FALSE;
+-    }
+-
+-    return (bool) $this->filesystem->getAdapter()->rename($path, $newpath);
+-  }
+-
+-  /**
+-   * Checks that a rename is valid.
+-   *
+-   * @param string $source
+-   *   Source location of file.
+-   * @param string $dest
+-   *   Desination of renamed file.
+-   *
+-   * @return bool
+-   *   True on success, False on failure.
+-   *
+-   * @throws \Drupal\flysystem\StreamWrapper\Exception\FileNotFoundException
+-   * @throws \Drupal\flysystem\StreamWrapper\Exception\DirectoryExistsException
+-   * @throws \Drupal\flysystem\StreamWrapper\Exception\DirectoryNotEmptyException
+-   * @throws \Drupal\flysystem\StreamWrapper\Exception\NotADirectoryException
+-   */
+-  protected function isValidRename($source, $dest) {
+-    $adapter = $this->filesystem->getAdapter();
+-
+-    if (!$adapter->has($source)) {
+-      throw new FileNotFoundException($source);
+-    }
+-
+-    $subdir = Util::dirname($dest);
+-
+-    if (strlen($subdir) && !$adapter->has($subdir)) {
+-      throw new FileNotFoundException($source);
+-    }
+-
+-    if (!$adapter->has($dest)) {
+-      return TRUE;
+-    }
+-
+-    return $this->compareTypes($source, $dest);
+-  }
+-
+-  /**
+-   * Compares the file/dir for the source and dest.
+-   *
+-   * @param string $source
+-   *   Source of file.
+-   * @param string $dest
+-   *   Destination of renamed file.
+-   *
+-   * @return bool
+-   *   True on success, False on failure.
+-   *
+-   * @throws \Drupal\flysystem\StreamWrapper\Exception\DirectoryExistsException
+-   * @throws \Drupal\flysystem\StreamWrapper\Exception\DirectoryNotEmptyException
+-   * @throws \Drupal\flysystem\StreamWrapper\Exception\NotADirectoryException
+-   */
+-  protected function compareTypes($source, $dest) {
+-    $adapter = $this->filesystem->getAdapter();
+-
+-    $source_type = $adapter->getMetadata($source)['type'];
+-    $dest_type = $adapter->getMetadata($dest)['type'];
+-
+-    // These three checks are done in order of cost to minimize Flysystem
+-    // calls.
+-    // Don't allow overwriting different types.
+-    if ($source_type !== $dest_type) {
+-      if ($dest_type === 'dir') {
+-        throw new DirectoryExistsException();
+-      }
+-
+-      throw new NotADirectoryException();
+-    }
+-
+-    // Allow overwriting destination file.
+-    if ($source_type === 'file') {
+-      return $adapter->delete($dest);
+-    }
+-
+-    // Allow overwriting destination directory if not empty.
+-    $contents = $this->filesystem->listContents($dest);
+-    if (!empty($contents)) {
+-      throw new DirectoryNotEmptyException();
+-    }
+-
+-    return $adapter->deleteDir($dest);
+-  }
+-
+-}
+diff --git a/src/StreamWrapper/Plugin/MimeType.php b/src/StreamWrapper/Plugin/MimeType.php
+deleted file mode 100644
+index fab0d9f..0000000
+--- a/src/StreamWrapper/Plugin/MimeType.php
++++ /dev/null
+@@ -1,259 +0,0 @@
+-<?php
+-
+-namespace Drupal\flysystem\StreamWrapper\Plugin;
+-
+-/**
+- * Pulled MimeType class from Flysystem v1, will be deprecated in v3.
+- */
+-class MimeType {
+-
+-  /**
+-   * Map array of mime types.
+-   *
+-   * @var array
+-   */
+-  protected static $extensionToMimeTypeMap = [
+-    'hqx' => 'application/mac-binhex40',
+-    'cpt' => 'application/mac-compactpro',
+-    'csv' => 'text/csv',
+-    'bin' => 'application/octet-stream',
+-    'dms' => 'application/octet-stream',
+-    'lha' => 'application/octet-stream',
+-    'lzh' => 'application/octet-stream',
+-    'exe' => 'application/octet-stream',
+-    'class' => 'application/octet-stream',
+-    'psd' => 'application/x-photoshop',
+-    'so' => 'application/octet-stream',
+-    'sea' => 'application/octet-stream',
+-    'dll' => 'application/octet-stream',
+-    'oda' => 'application/oda',
+-    'pdf' => 'application/pdf',
+-    'ai' => 'application/pdf',
+-    'eps' => 'application/postscript',
+-    'epub' => 'application/epub+zip',
+-    'ps' => 'application/postscript',
+-    'smi' => 'application/smil',
+-    'smil' => 'application/smil',
+-    'mif' => 'application/vnd.mif',
+-    'xls' => 'application/vnd.ms-excel',
+-    'xlt' => 'application/vnd.ms-excel',
+-    'xla' => 'application/vnd.ms-excel',
+-    'ppt' => 'application/powerpoint',
+-    'pot' => 'application/vnd.ms-powerpoint',
+-    'pps' => 'application/vnd.ms-powerpoint',
+-    'ppa' => 'application/vnd.ms-powerpoint',
+-    'pptx' => 'application/vnd.openxmlformats-officedocument.presentationml.presentation',
+-    'potx' => 'application/vnd.openxmlformats-officedocument.presentationml.template',
+-    'ppsx' => 'application/vnd.openxmlformats-officedocument.presentationml.slideshow',
+-    'ppam' => 'application/vnd.ms-powerpoint.addin.macroEnabled.12',
+-    'pptm' => 'application/vnd.ms-powerpoint.presentation.macroEnabled.12',
+-    'potm' => 'application/vnd.ms-powerpoint.presentation.macroEnabled.12',
+-    'ppsm' => 'application/vnd.ms-powerpoint.slideshow.macroEnabled.12',
+-    'wbxml' => 'application/wbxml',
+-    'wmlc' => 'application/wmlc',
+-    'dcr' => 'application/x-director',
+-    'dir' => 'application/x-director',
+-    'dxr' => 'application/x-director',
+-    'dvi' => 'application/x-dvi',
+-    'gtar' => 'application/x-gtar',
+-    'gz' => 'application/x-gzip',
+-    'gzip' => 'application/x-gzip',
+-    'php' => 'application/x-httpd-php',
+-    'php4' => 'application/x-httpd-php',
+-    'php3' => 'application/x-httpd-php',
+-    'phtml' => 'application/x-httpd-php',
+-    'phps' => 'application/x-httpd-php-source',
+-    'js' => 'application/javascript',
+-    'swf' => 'application/x-shockwave-flash',
+-    'sit' => 'application/x-stuffit',
+-    'tar' => 'application/x-tar',
+-    'tgz' => 'application/x-tar',
+-    'z' => 'application/x-compress',
+-    'xhtml' => 'application/xhtml+xml',
+-    'xht' => 'application/xhtml+xml',
+-    'rdf' => 'application/rdf+xml',
+-    'zip' => 'application/x-zip',
+-    'rar' => 'application/x-rar',
+-    'mid' => 'audio/midi',
+-    'midi' => 'audio/midi',
+-    'mpga' => 'audio/mpeg',
+-    'mp2' => 'audio/mpeg',
+-    'mp3' => 'audio/mpeg',
+-    'aif' => 'audio/x-aiff',
+-    'aiff' => 'audio/x-aiff',
+-    'aifc' => 'audio/x-aiff',
+-    'ram' => 'audio/x-pn-realaudio',
+-    'rm' => 'audio/x-pn-realaudio',
+-    'rpm' => 'audio/x-pn-realaudio-plugin',
+-    'ra' => 'audio/x-realaudio',
+-    'rv' => 'video/vnd.rn-realvideo',
+-    'wav' => 'audio/x-wav',
+-    'jpg' => 'image/jpeg',
+-    'jpeg' => 'image/jpeg',
+-    'jpe' => 'image/jpeg',
+-    'png' => 'image/png',
+-    'gif' => 'image/gif',
+-    'bmp' => 'image/bmp',
+-    'tiff' => 'image/tiff',
+-    'tif' => 'image/tiff',
+-    'svg' => 'image/svg+xml',
+-    'css' => 'text/css',
+-    'html' => 'text/html',
+-    'htm' => 'text/html',
+-    'shtml' => 'text/html',
+-    'txt' => 'text/plain',
+-    'text' => 'text/plain',
+-    'log' => 'text/plain',
+-    'markdown' => 'text/markdown',
+-    'md' => 'text/markdown',
+-    'rtx' => 'text/richtext',
+-    'rtf' => 'text/rtf',
+-    'xml' => 'application/xml',
+-    'xsl' => 'application/xml',
+-    'dmn' => 'application/octet-stream',
+-    'bpmn' => 'application/octet-stream',
+-    'mpeg' => 'video/mpeg',
+-    'mpg' => 'video/mpeg',
+-    'mpe' => 'video/mpeg',
+-    'qt' => 'video/quicktime',
+-    'mov' => 'video/quicktime',
+-    'avi' => 'video/x-msvideo',
+-    'movie' => 'video/x-sgi-movie',
+-    'doc' => 'application/msword',
+-    'docx' => 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+-    'docm' => 'application/vnd.ms-word.template.macroEnabled.12',
+-    'dotm' => 'application/vnd.ms-word.template.macroEnabled.12',
+-    'dot' => 'application/msword',
+-    'dotx' => 'application/vnd.openxmlformats-officedocument.wordprocessingml.template',
+-    'xlsx' => 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+-    'xltx' => 'application/vnd.openxmlformats-officedocument.spreadsheetml.template',
+-    'xlsm' => 'application/vnd.ms-excel.sheet.macroEnabled.12',
+-    'xltm' => 'application/vnd.ms-excel.template.macroEnabled.12',
+-    'xlam' => 'application/vnd.ms-excel.addin.macroEnabled.12',
+-    'xlsb' => 'application/vnd.ms-excel.sheet.binary.macroEnabled.12',
+-    'word' => 'application/msword',
+-    'xl' => 'application/excel',
+-    'eml' => 'message/rfc822',
+-    'json' => 'application/json',
+-    'pem' => 'application/x-x509-user-cert',
+-    'p10' => 'application/x-pkcs10',
+-    'p12' => 'application/x-pkcs12',
+-    'p7a' => 'application/x-pkcs7-signature',
+-    'p7c' => 'application/pkcs7-mime',
+-    'p7m' => 'application/pkcs7-mime',
+-    'p7r' => 'application/x-pkcs7-certreqresp',
+-    'p7s' => 'application/pkcs7-signature',
+-    'crt' => 'application/x-x509-ca-cert',
+-    'crl' => 'application/pkix-crl',
+-    'der' => 'application/x-x509-ca-cert',
+-    'kdb' => 'application/octet-stream',
+-    'pgp' => 'application/pgp',
+-    'gpg' => 'application/gpg-keys',
+-    'sst' => 'application/octet-stream',
+-    'csr' => 'application/octet-stream',
+-    'rsa' => 'application/x-pkcs7',
+-    'cer' => 'application/pkix-cert',
+-    '3g2' => 'video/3gpp2',
+-    '3gp' => 'video/3gp',
+-    'mp4' => 'video/mp4',
+-    'm4a' => 'audio/x-m4a',
+-    'f4v' => 'video/mp4',
+-    'webm' => 'video/webm',
+-    'aac' => 'audio/x-acc',
+-    'm4u' => 'application/vnd.mpegurl',
+-    'm3u' => 'text/plain',
+-    'xspf' => 'application/xspf+xml',
+-    'vlc' => 'application/videolan',
+-    'wmv' => 'video/x-ms-wmv',
+-    'au' => 'audio/x-au',
+-    'ac3' => 'audio/ac3',
+-    'flac' => 'audio/x-flac',
+-    'ogg' => 'audio/ogg',
+-    'kmz' => 'application/vnd.google-earth.kmz',
+-    'kml' => 'application/vnd.google-earth.kml+xml',
+-    'ics' => 'text/calendar',
+-    'zsh' => 'text/x-scriptzsh',
+-    '7zip' => 'application/x-7z-compressed',
+-    'cdr' => 'application/cdr',
+-    'wma' => 'audio/x-ms-wma',
+-    'jar' => 'application/java-archive',
+-    'tex' => 'application/x-tex',
+-    'latex' => 'application/x-latex',
+-    'odt' => 'application/vnd.oasis.opendocument.text',
+-    'ods' => 'application/vnd.oasis.opendocument.spreadsheet',
+-    'odp' => 'application/vnd.oasis.opendocument.presentation',
+-    'odg' => 'application/vnd.oasis.opendocument.graphics',
+-    'odc' => 'application/vnd.oasis.opendocument.chart',
+-    'odf' => 'application/vnd.oasis.opendocument.formula',
+-    'odi' => 'application/vnd.oasis.opendocument.image',
+-    'odm' => 'application/vnd.oasis.opendocument.text-master',
+-    'odb' => 'application/vnd.oasis.opendocument.database',
+-    'ott' => 'application/vnd.oasis.opendocument.text-template',
+-    'webp' => 'image/webp',
+-    'ico' => 'image/x-icon',
+-  ];
+-
+-  /**
+-   * Detects MIME Type based on given content.
+-   *
+-   * @param mixed $content
+-   *   Content for detection.
+-   *
+-   * @return string|null
+-   *   MIME Type or NULL if no mime type detected
+-   */
+-  public static function detectByContent($content) {
+-    if (!class_exists('finfo') || !is_string($content)) {
+-      return NULL;
+-    }
+-    try {
+-      $finfo = new \finfo(FILEINFO_MIME_TYPE);
+-
+-      return $finfo->buffer($content) ?: NULL;
+-      // @codeCoverageIgnoreStart
+-    }
+-    catch (\ErrorException $e) {
+-      // This is caused by an array to string conversion error.
+-      // @codeCoverageIgnoreEnd
+-    }
+-  }
+-
+-  /**
+-   * Detects MIME Type based on file extension.
+-   *
+-   * @param string $extension
+-   *   File Extension.
+-   *
+-   * @return string|null
+-   *   MIME Type or NULL if no extension detected
+-   */
+-  public static function detectByFileExtension($extension) {
+-    return static::$extensionToMimeTypeMap[$extension] ?? 'text/plain';
+-  }
+-
+-  /**
+-   * Detect MIME type by file name.
+-   *
+-   * @param string $filename
+-   *   File name.
+-   *
+-   * @return string|null
+-   *   MIME Type or NULL if no extension detected
+-   */
+-  public static function detectByFilename($filename) {
+-    $extension = strtolower(pathinfo($filename, PATHINFO_EXTENSION));
+-
+-    return empty($extension) ? 'text/plain' : static::detectByFileExtension($extension);
+-  }
+-
+-  /**
+-   * File Extension MIME type map.
+-   *
+-   * @return array
+-   *   Map of file extension to MIME Type
+-   */
+-  public static function getExtensionToMimeTypeMap() {
+-    return static::$extensionToMimeTypeMap;
+-  }
+-
+-}
+diff --git a/src/StreamWrapper/Plugin/Mkdir.php b/src/StreamWrapper/Plugin/Mkdir.php
+deleted file mode 100644
+index 42a20f5..0000000
+--- a/src/StreamWrapper/Plugin/Mkdir.php
++++ /dev/null
+@@ -1,51 +0,0 @@
+-<?php
+-
+-namespace Drupal\flysystem\StreamWrapper\Plugin;
+-
+-use Drupal\flysystem\StreamWrapper\Exception\FileNotFoundException;
+-
+-/**
+- * Make Directory Plugin.
+- */
+-class Mkdir extends AbstractPlugin {
+-
+-  /**
+-   * {@inheritdoc}
+-   */
+-  public function getMethod() {
+-    return 'mkdir';
+-  }
+-
+-  /**
+-   * Creates a directory.
+-   *
+-   * @param string $dirname
+-   *   Directory to create.
+-   * @param int $mode
+-   *   Directory mode.
+-   * @param int $options
+-   *   Options for creation.
+-   *
+-   * @return bool
+-   *   True on success, false on failure.
+-   *
+-   * @throws \Drupal\flysystem\StreamWrapper\Exception\FileNotFoundException
+-   */
+-  public function handle($dirname, $mode, $options) {
+-    $dirname = Util::normalizePath($dirname);
+-
+-    $adapter = $this->filesystem->getAdapter();
+-
+-    // If recursive, or a single level directory, just create it.
+-    if (($options & STREAM_MKDIR_RECURSIVE) || strpos($dirname, '/') === FALSE) {
+-      return (bool) $adapter->createDir($dirname, $this->defaultConfig());
+-    }
+-
+-    if (!$adapter->has(dirname($dirname))) {
+-      throw new FileNotFoundException($dirname);
+-    }
+-
+-    return (bool) $adapter->createDir($dirname, $this->defaultConfig());
+-  }
+-
+-}
+diff --git a/src/StreamWrapper/Plugin/PosixUid.php b/src/StreamWrapper/Plugin/PosixUid.php
+deleted file mode 100644
+index 4c3c687..0000000
+--- a/src/StreamWrapper/Plugin/PosixUid.php
++++ /dev/null
+@@ -1,30 +0,0 @@
+-<?php
+-
+-namespace Drupal\flysystem\StreamWrapper\Plugin;
+-
+-/**
+- * Posix compliant uid / gid manager.
+- */
+-class PosixUid extends Uid {
+-
+-  /**
+-   * Get user Uid.
+-   *
+-   * @return int
+-   *   Posix compliance UID.
+-   */
+-  public function getUid() {
+-    return (int) posix_getuid();
+-  }
+-
+-  /**
+-   * Get user Gid.
+-   *
+-   * @return int
+-   *   Posix compliant GID.
+-   */
+-  public function getGid() {
+-    return (int) posix_getuid();
+-  }
+-
+-}
+diff --git a/src/StreamWrapper/Plugin/Rmdir.php b/src/StreamWrapper/Plugin/Rmdir.php
+deleted file mode 100644
+index b83c566..0000000
+--- a/src/StreamWrapper/Plugin/Rmdir.php
++++ /dev/null
+@@ -1,56 +0,0 @@
+-<?php
+-
+-namespace Drupal\flysystem\StreamWrapper\Plugin;
+-
+-use Drupal\flysystem\StreamWrapper\Exception\RootViolationException;
+-use Drupal\flysystem\StreamWrapper\Exception\DirectoryNotEmptyException;
+-
+-/**
+- * Remove Directory plugin.
+- */
+-class Rmdir extends AbstractPlugin {
+-
+-  /**
+-   * {@inheritdoc}
+-   */
+-  public function getMethod() {
+-    return 'rmdir';
+-  }
+-
+-  /**
+-   * Delete a directory.
+-   *
+-   * @param string $dirname
+-   *   Path to directory.
+-   * @param int $options
+-   *   Options on handle.
+-   *
+-   * @return bool
+-   *   True if success, False if failed.
+-   *
+-   * @throws \Drupal\flysystem\StreamWrapper\Exception\DirectoryNotEmptyException
+-   */
+-  public function handle($dirname, $options) {
+-    $dirname = Util::normalizePath($dirname);
+-
+-    if ($dirname === '') {
+-      throw new RootViolationException('Root directories can not be deleted.');
+-    }
+-
+-    $adapter = $this->filesystem->getAdapter();
+-
+-    if ($options & STREAM_MKDIR_RECURSIVE) {
+-      // I don't know how this gets triggered.
+-      return (bool) $adapter->deleteDir($dirname);
+-    }
+-
+-    $contents = $this->filesystem->listContents($dirname);
+-
+-    if (!empty($contents)) {
+-      throw new DirectoryNotEmptyException();
+-    }
+-
+-    return (bool) $adapter->deleteDir($dirname);
+-  }
+-
+-}
+diff --git a/src/StreamWrapper/Plugin/Stat.php b/src/StreamWrapper/Plugin/Stat.php
+index 41b31a9..6c9ef90 100644
+--- a/src/StreamWrapper/Plugin/Stat.php
++++ b/src/StreamWrapper/Plugin/Stat.php
+@@ -3,6 +3,7 @@
+ namespace Drupal\flysystem\StreamWrapper\Plugin;
+ 
+ use League\Flysystem\AdapterInterface;
++use League\Flysystem\Plugin\AbstractPlugin;
+ use Drupal\flysystemStreamWrapper\FlysystemStreamWrapper;
+ 
+ /**
+@@ -44,13 +45,6 @@ class Stat extends AbstractPlugin {
+    */
+   protected $required;
+ 
+-  /**
+-   * User ID.
+-   *
+-   * @var \Drupal\flysystem\StreamWrapper\Plugin\Uid
+-   */
+-  protected $uid;
+-
+   /**
+    * Constructs a Stat object.
+    *
+@@ -62,7 +56,6 @@ class Stat extends AbstractPlugin {
+   public function __construct(array $permissions, array $metadata) {
+     $this->permissions = $permissions;
+     $this->required = array_combine($metadata, $metadata);
+-    $this->uid = \extension_loaded('posix') ? new PosixUid() : new Uid();
+   }
+ 
+   /**
+@@ -188,8 +181,8 @@ class Stat extends AbstractPlugin {
+   protected function mergeMeta(array $metadata) {
+     $ret = static::$defaultMeta;
+ 
+-    $ret['uid'] = $this->uid->getUid();
+-    $ret['gid'] = $this->uid->getGid();
++    $ret['uid'] = \extension_loaded('posix') ? (int) posix_getuid() : (int) getmyuid();
++    $ret['gid'] = \extension_loaded('posix') ? (int) posix_getuid() : (int) getmygid();
+ 
+     $ret['mode'] = $metadata['type'] === 'dir' ? 040000 : 0100000;
+ 
+diff --git a/src/StreamWrapper/Plugin/Touch.php b/src/StreamWrapper/Plugin/Touch.php
+deleted file mode 100644
+index 80f4e2a..0000000
+--- a/src/StreamWrapper/Plugin/Touch.php
++++ /dev/null
+@@ -1,38 +0,0 @@
+-<?php
+-
+-namespace Drupal\flysystem\StreamWrapper\Plugin;
+-
+-/**
+- * Creates a file using "touch".
+- */
+-class Touch extends AbstractPlugin {
+-
+-  /**
+-   * {@inheritdoc}
+-   */
+-  public function getMethod() {
+-    return 'touch';
+-  }
+-
+-  /**
+-   * Emulates touch().
+-   *
+-   * @param string $path
+-   *   Path to file.
+-   *
+-   * @return bool
+-   *   True on success, false on failure.
+-   */
+-  public function handle($path) {
+-    $path = Util::normalizePath($path);
+-
+-    $adapter = $this->filesystem->getAdapter();
+-
+-    if ($adapter->has($path)) {
+-      return TRUE;
+-    }
+-
+-    return (bool) $adapter->write($path, '', $this->defaultConfig());
+-  }
+-
+-}
+diff --git a/src/StreamWrapper/Plugin/Uid.php b/src/StreamWrapper/Plugin/Uid.php
+deleted file mode 100644
+index c247831..0000000
+--- a/src/StreamWrapper/Plugin/Uid.php
++++ /dev/null
+@@ -1,24 +0,0 @@
+-<?php
+-
+-namespace Drupal\flysystem\StreamWrapper\Plugin;
+-
+-/**
+- * User / Group ID determination.
+- */
+-class Uid {
+-
+-  /**
+-   * Gets Uid of user.
+-   */
+-  public function getUid() {
+-    return (int) getmyuid();
+-  }
+-
+-  /**
+-   * Gets Gid of user.
+-   */
+-  public function getGid() {
+-    return (int) getmygid();
+-  }
+-
+-}
+diff --git a/src/StreamWrapper/Plugin/Util.php b/src/StreamWrapper/Plugin/Util.php
+deleted file mode 100644
+index 8c129c4..0000000
+--- a/src/StreamWrapper/Plugin/Util.php
++++ /dev/null
+@@ -1,378 +0,0 @@
+-<?php
+-
+-namespace Drupal\flysystem\StreamWrapper\Plugin;
+-
+-/**
+- * General Utility class.
+- */
+-class Util {
+-
+-  /**
+-   * Get normalized pathinfo.
+-   *
+-   * @param string $path
+-   *   Path to normalize.
+-   *
+-   * @return array
+-   *   Path information array.
+-   */
+-  public static function pathinfo($path) {
+-    $pathinfo = compact('path');
+-
+-    if ('' !== $dirname = dirname($path)) {
+-      $pathinfo['dirname'] = static::normalizeDirname($dirname);
+-    }
+-
+-    $pathinfo['basename'] = static::basename($path);
+-
+-    $pathinfo += pathinfo($pathinfo['basename']);
+-
+-    return $pathinfo + ['dirname' => ''];
+-  }
+-
+-  /**
+-   * Normalize a dirname return value.
+-   *
+-   * @param string $dirname
+-   *   Directory name.
+-   *
+-   * @return string
+-   *   Normalized directory name.
+-   */
+-  public static function normalizeDirname($dirname) {
+-    return $dirname === '.' ? '' : $dirname;
+-  }
+-
+-  /**
+-   * Get a normalized dirname from a path.
+-   *
+-   * @param string $path
+-   *   Directory name.
+-   *
+-   * @return string
+-   *   Normalized directory name.
+-   */
+-  public static function dirname($path) {
+-    return static::normalizeDirname(dirname($path));
+-  }
+-
+-  /**
+-   * Map result arrays.
+-   *
+-   * @param array $object
+-   *   Object to map.
+-   * @param array $map
+-   *   Convertd array map.
+-   *
+-   * @return array
+-   *   Mapped result.
+-   */
+-  public static function map(array $object, array $map) {
+-    $result = [];
+-
+-    foreach ($map as $from => $to) {
+-      if (!isset($object[$from])) {
+-        continue;
+-      }
+-
+-      $result[$to] = $object[$from];
+-    }
+-
+-    return $result;
+-  }
+-
+-  /**
+-   * Normalize path.
+-   *
+-   * @param string $path
+-   *   Path to normalize.
+-   *
+-   * @return string
+-   *   Normalized path.
+-   *
+-   * @throws \LogicException
+-   */
+-  public static function normalizePath($path) {
+-    return static::normalizeRelativePath($path);
+-  }
+-
+-  /**
+-   * Normalize relative directories in a path.
+-   *
+-   * @param string $path
+-   *   Path containing directories to normalize.
+-   *
+-   * @return string
+-   *   Normalized path.
+-   *
+-   * @throws \LogicException
+-   */
+-  public static function normalizeRelativePath($path) {
+-    $path = str_replace('\\', '/', $path);
+-    $path = static::removeFunkyWhiteSpace($path);
+-
+-    $parts = [];
+-
+-    foreach (explode('/', $path) as $part) {
+-      switch ($part) {
+-        case '':
+-        case '.':
+-          break;
+-
+-        case '..':
+-          if (empty($parts)) {
+-            throw new \LogicException(
+-                  'Path is outside of the defined root, path: [' . $path . ']'
+-              );
+-          }
+-          array_pop($parts);
+-          break;
+-
+-        default:
+-          $parts[] = $part;
+-          break;
+-      }
+-    }
+-
+-    return implode('/', $parts);
+-  }
+-
+-  /**
+-   * Removes unprintable characters and invalid unicode characters.
+-   *
+-   * @param string $path
+-   *   Path to process.
+-   *
+-   * @return string
+-   *   Processed path.
+-   */
+-  protected static function removeFunkyWhiteSpace($path) {
+-    // We do this check in a loop, since removing invalid unicode characters
+-    // can lead to new characters being created.
+-    while (preg_match('#\p{C}+|^\./#u', $path)) {
+-      $path = preg_replace('#\p{C}+|^\./#u', '', $path);
+-    }
+-
+-    return $path;
+-  }
+-
+-  /**
+-   * Normalize prefix.
+-   *
+-   * @param string $prefix
+-   *   Prefix to normalize.
+-   * @param string $separator
+-   *   Path separator.
+-   *
+-   * @return string
+-   *   Normalized path.
+-   */
+-  public static function normalizePrefix($prefix, $separator) {
+-    return rtrim($prefix, $separator) . $separator;
+-  }
+-
+-  /**
+-   * Get content size.
+-   *
+-   * @param string $contents
+-   *   Content.
+-   *
+-   * @return int
+-   *   Size of content.
+-   */
+-  public static function contentSize($contents) {
+-    return defined('MB_OVERLOAD_STRING') ? mb_strlen($contents, '8bit') : strlen($contents);
+-  }
+-
+-  /**
+-   * Guess MIME Type based on the path of the file and it's content.
+-   *
+-   * @param string $path
+-   *   Path to file.
+-   * @param string|resource $content
+-   *   Content.
+-   *
+-   * @return string|null
+-   *   MIME Type or NULL if no extension detected.
+-   */
+-  public static function guessMimeType($path, $content) {
+-    $mimeType = MimeType::detectByContent($content);
+-
+-    if (!(empty($mimeType) || in_array($mimeType, ['application/x-empty', 'text/plain', 'text/x-asm']))) {
+-      return $mimeType;
+-    }
+-
+-    return MimeType::detectByFilename($path);
+-  }
+-
+-  /**
+-   * Emulate directories.
+-   *
+-   * @param array $listing
+-   *   Directory.
+-   *
+-   * @return array
+-   *   Listing with emulated directories.
+-   */
+-  public static function emulateDirectories(array $listing) {
+-    $directories = [];
+-    $listedDirectories = [];
+-
+-    foreach ($listing as $object) {
+-      [$directories, $listedDirectories] = static::emulateObjectDirectories($object, $directories, $listedDirectories);
+-    }
+-
+-    $directories = array_diff(array_unique($directories), array_unique($listedDirectories));
+-
+-    foreach ($directories as $directory) {
+-      $listing[] = static::pathinfo($directory) + ['type' => 'dir'];
+-    }
+-
+-    return $listing;
+-  }
+-
+-  /**
+-   * Ensure a Config instance.
+-   *
+-   * @param null|array|Config $config
+-   *   Config array, object, or NULL if none.
+-   *
+-   * @return Config
+-   *   Config instance.
+-   *
+-   * @throw \LogicException
+-   */
+-  public static function ensureConfig($config) {
+-    if ($config === NULL) {
+-      return new Config();
+-    }
+-
+-    if ($config instanceof Config) {
+-      return $config;
+-    }
+-
+-    if (is_array($config)) {
+-      return new Config($config);
+-    }
+-
+-    throw new \LogicException('A config should either be an array or a Flysystem\Config object.');
+-  }
+-
+-  /**
+-   * Rewind a stream.
+-   *
+-   * @param resource $resource
+-   *   Resource.
+-   */
+-  public static function rewindStream($resource) {
+-    if (ftell($resource) !== 0 && static::isSeekableStream($resource)) {
+-      rewind($resource);
+-    }
+-  }
+-
+-  /**
+-   * Checks resources to see if it's a seekable stream.
+-   *
+-   * @return bool
+-   *   True if yes, False if no.
+-   */
+-  public static function isSeekableStream($resource) {
+-    $metadata = stream_get_meta_data($resource);
+-
+-    return $metadata['seekable'];
+-  }
+-
+-  /**
+-   * Get the size of a stream.
+-   *
+-   * @param resource $resource
+-   *   Resource to check.
+-   *
+-   * @return int|null
+-   *   Stream size.
+-   */
+-  public static function getStreamSize($resource) {
+-    $stat = fstat($resource);
+-
+-    if (!is_array($stat) || !isset($stat['size'])) {
+-      return NULL;
+-    }
+-
+-    return $stat['size'];
+-  }
+-
+-  /**
+-   * Emulate the directories of a single object.
+-   *
+-   * @param array $object
+-   *   Array of object.
+-   * @param array $directories
+-   *   Array of directories.
+-   * @param array $listedDirectories
+-   *   Array of locations.
+-   *
+-   * @return array
+-   *   Emulated directory.
+-   */
+-  protected static function emulateObjectDirectories(array $object, array $directories, array $listedDirectories) {
+-    if ($object['type'] === 'dir') {
+-      $listedDirectories[] = $object['path'];
+-    }
+-
+-    if (!isset($object['dirname']) || trim($object['dirname']) === '') {
+-      return [$directories, $listedDirectories];
+-    }
+-
+-    $parent = $object['dirname'];
+-
+-    while (isset($parent) && trim($parent) !== '' && !in_array($parent, $directories)) {
+-      $directories[] = $parent;
+-      $parent = static::dirname($parent);
+-    }
+-
+-    if (isset($object['type']) && $object['type'] === 'dir') {
+-      $listedDirectories[] = $object['path'];
+-
+-      return [$directories, $listedDirectories];
+-    }
+-
+-    return [$directories, $listedDirectories];
+-  }
+-
+-  /**
+-   * Returns the trailing name component of the path.
+-   *
+-   * @param string $path
+-   *   Path.
+-   *
+-   * @return string
+-   *   Trailing name from path.
+-   */
+-  private static function basename($path) {
+-    $separators = DIRECTORY_SEPARATOR === '/' ? '/' : '\/';
+-
+-    $path = rtrim($path, $separators);
+-
+-    $basename = preg_replace('#.*?([^' . preg_quote($separators, '#') . ']+$)#', '$1', $path);
+-
+-    if (DIRECTORY_SEPARATOR === '/') {
+-      return $basename;
+-    }
+-    // @codeCoverageIgnoreStart
+-    // Extra Windows path munging. This is tested via AppVeyor, but code
+-    // coverage is not reported.
+-    // Handle relative paths with drive letters. c:file.txt.
+-    while (preg_match('#^[a-zA-Z]{1}:[^\\\/]#', $basename)) {
+-      $basename = substr($basename, 2);
+-    }
+-
+-    // Remove colon for standalone drive letter names.
+-    if (preg_match('#^[a-zA-Z]{1}:$#', $basename)) {
+-      $basename = rtrim($basename, ':');
+-    }
+-
+-    return $basename;
+-    // @codeCoverageIgnoreEnd
+-  }
+-
+-}
