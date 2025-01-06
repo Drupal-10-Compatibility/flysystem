@@ -75,6 +75,13 @@
     </testsuite>
     <testsuite name="build">
       <file>./web/core/tests/TestSuites/BuildTestSuite.php</file>
+      <exclude></exclude>
+    </testsuite>
+    <testsuite name="Flysystem Unit Test Suite">
+      <directory>./web/modules/contrib/flysystem/tests/</directory>
+      <exclude>
+        ./web/modules/contrib/flysystem/tests/src/Kernel/CollectionOptimizerTest.php
+      </exclude>
     </testsuite>
   </testsuites>
   <listeners>
