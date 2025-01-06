@@ -120,6 +120,7 @@
                 "Fixing php 8.2 compatibility issue swith php-compatibility-sniffer":"patches/php-compatibility-sniffer-8.1-patch.patch"
             },
             "drupal/flysystem": {
+                "Factor out StreamUtil class": "patches/factor-out-streamutil.patch"
             }
         }
     },
