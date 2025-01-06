@@ -1,0 +1,65 @@
+diff --git a/tests/src/Unit/Flysystem/Adapter/DrupalCacheAdapterTest.php b/tests/src/Unit/Flysystem/Adapter/DrupalCacheAdapterTest.php
+index 04bc7cb..91accf9 100644
+--- a/tests/src/Unit/Flysystem/Adapter/DrupalCacheAdapterTest.php
++++ b/tests/src/Unit/Flysystem/Adapter/DrupalCacheAdapterTest.php
+@@ -249,24 +249,54 @@ class DrupalCacheAdapterTest extends UnitTestCase {
+    * Tests reading a file.
+    */
+   public function testRead() {
+-    $this->adapter->read(static::FILE)->willReturn(TRUE);
+-    $this->assertTrue($this->cacheAdapter->read(static::FILE));
++    $this->adapter->read(static::FILE)->willReturn(FALSE);
++    $this->assertFalse($this->cacheAdapter->read(static::FILE));
++
++    $config = new Config();
++    $this->adapter
++      ->write(static::FILE, 'contents', $config);
++    $return = [
++      'type' => 'file',
++      'path' => static::FILE,
++      'contents' => $config,
++    ];
++    $this->adapter->read(static::FILE)->willReturn($return);
++    $this->assertSame($this->cacheAdapter->read(static::FILE), $return);
+   }
+ 
+   /**
+    * Tests reading a stream.
+    */
+   public function testReadStream() {
+-    $this->adapter->readStream(static::FILE)->willReturn(TRUE);
+-    $this->assertTrue($this->cacheAdapter->readStream(static::FILE));
++    $this->adapter->readStream(static::FILE)->willReturn(FALSE);
++    $this->assertFalse($this->cacheAdapter->readStream(static::FILE));
++
++    $config = new Config();
++    $stream = fopen('data:text/plain,contents', 'rb');
++    $this->adapter
++      ->writeStream(static::FILE, $stream, $config);
++
++    $return = [
++      'type' => 'file',
++      'path' => static::FILE,
++      'stream' => $stream,
++    ];
++
++    $this->adapter->readStream(static::FILE)->willReturn($return);
++    $this->assertSame($this->cacheAdapter->readStream(static::FILE), $return);
+   }
+ 
+   /**
+    * Tests listing contents of a directory.
+    */
+   public function testListContentsSuccess() {
+-    $this->adapter->listContents('testdir', TRUE)->willReturn(TRUE);
+-    $this->assertTrue($this->cacheAdapter->listContents('testdir', TRUE));
++    $return = [
++      ['path' => 'testdir'],
++      ['path' => 'testdir/test.txt'],
++    ];
++
++    $this->adapter->listContents('testdir', TRUE)->willReturn($return);
++    $this->assertSame($this->cacheAdapter->listContents('testdir', TRUE), $return);
+   }
+ 
+   /**
