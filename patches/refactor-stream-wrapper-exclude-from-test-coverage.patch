@@ -1,3 +1,138 @@
+diff --git a/src/Asset/CssCollectionOptimizer.php b/src/Asset/CssCollectionOptimizer.php
+deleted file mode 100644
+index d28e678..0000000
+--- a/src/Asset/CssCollectionOptimizer.php
++++ /dev/null
+@@ -1,47 +0,0 @@
+-<?php
+-
+-namespace Drupal\flysystem\Asset;
+-
+-use Drupal\Core\Asset\CssCollectionOptimizer as DrupalCssCollectionOptimizer;
+-use Drupal\Core\Logger\LoggerChannelTrait;
+-
+-/**
+- * Optimizes CSS assets.
+- *
+- * @codeCoverageIgnore
+- * @phpstan-ignore class.extendsDeprecatedClass
+- */
+-class CssCollectionOptimizer extends DrupalCssCollectionOptimizer {
+-
+-  use SchemeExtensionTrait;
+-  use LoggerChannelTrait;
+-
+-  /**
+-   * {@inheritdoc}
+-   */
+-  public function deleteAll() {
+-    $this->state->delete('drupal_css_cache_files');
+-    /** @var \Drupal\Core\File\FileSystem $file_system */
+-    $file_system = $this->fileSystem;
+-    $delete_stale = static function ($uri) use ($file_system) {
+-      // Default stale file threshold is 30 days (2592000 seconds).
+-      // @phpstan-ignore-next-line
+-      $stale_file_threshold = \Drupal::config('system.performance')->get('stale_file_threshold') ?? 2592000;
+-      // @phpstan-ignore-next-line
+-      if (\Drupal::time()->getRequestTime() - filemtime($uri) > $stale_file_threshold) {
+-        try {
+-          $file_system->delete($uri);
+-        }
+-        catch (\Exception $e) {
+-          // @phpstan-ignore-next-line
+-          \Drupal::service('logger.factory')->get('flysystem')->error($e->getMessage());
+-        }
+-      }
+-    };
+-    $css_dir = $this->getSchemeForExtension('css') . '://css';
+-    if (is_dir($css_dir)) {
+-      $file_system->scanDirectory($css_dir, '/.*/', ['callback' => $delete_stale]);
+-    }
+-  }
+-
+-}
+diff --git a/src/Asset/JsCollectionOptimizer.php b/src/Asset/JsCollectionOptimizer.php
+deleted file mode 100644
+index cf314d1..0000000
+--- a/src/Asset/JsCollectionOptimizer.php
++++ /dev/null
+@@ -1,47 +0,0 @@
+-<?php
+-
+-namespace Drupal\flysystem\Asset;
+-
+-use Drupal\Core\Asset\JsCollectionOptimizer as DrupalJsCollectionOptimizer;
+-use Drupal\Core\Logger\LoggerChannelTrait;
+-
+-/**
+- * Optimizes JavaScript assets.
+- *
+- * @codeCoverageIgnore
+- * @phpstan-ignore class.extendsDeprecatedClass
+- */
+-class JsCollectionOptimizer extends DrupalJsCollectionOptimizer {
+-
+-  use SchemeExtensionTrait;
+-  use LoggerChannelTrait;
+-
+-  /**
+-   * {@inheritdoc}
+-   */
+-  public function deleteAll() {
+-    $this->state->delete('system.js_cache_files');
+-    /** @var \Drupal\Core\File\FileSystem $file_system */
+-    $file_system = $this->fileSystem;
+-    $delete_stale = static function ($uri) use ($file_system) {
+-      // Default stale file threshold is 30 days (2592000 seconds).
+-      // @phpstan-ignore-next-line
+-      $stale_file_threshold = \Drupal::config('system.performance')->get('stale_file_threshold') ?? 2592000;
+-      // @phpstan-ignore-next-line
+-      if (\Drupal::time()->getRequestTime() - filemtime($uri) > $stale_file_threshold) {
+-        try {
+-          $file_system->delete($uri);
+-        }
+-        catch (\Exception $e) {
+-          // @phpstan-ignore-next-line
+-          \Drupal::service('logger.factory')->get('flysystem')->error($e->getMessage());
+-        }
+-      }
+-    };
+-    $js_dir = $this->getSchemeForExtension('js') . '://js';
+-    if (is_dir($js_dir)) {
+-      $file_system->scanDirectory($js_dir, '/.*/', ['callback' => $delete_stale]);
+-    }
+-  }
+-
+-}
+diff --git a/src/Asset/SchemeExtensionTrait.php b/src/Asset/SchemeExtensionTrait.php
+index 9fb2b30..45f3a90 100644
+--- a/src/Asset/SchemeExtensionTrait.php
++++ b/src/Asset/SchemeExtensionTrait.php
+@@ -20,13 +20,20 @@ trait SchemeExtensionTrait {
+    *   The scheme that should serve the extension.
+    */
+   public function getSchemeForExtension($extension) {
+-    $has_assets_scheme = class_exists(AssetsStream::class);
+     $extension_scheme = 'public';
++    $has_assets_scheme = class_exists(AssetsStream::class);
+ 
+     foreach (Settings::get('flysystem', []) as $scheme => $configuration) {
+-      if (!empty($configuration['serve_' . $extension]) && !empty($configuration['driver'])) {
+-        if ($has_assets_scheme) {
+-          @trigger_error(sprintf('The serve_%s Flysystem option is deprecated in flysystem:2.1.0 and is removed from flysystem:3.0.0. Use the assets:// stream wrapper instead. See https://www.drupal.org/node/3328126', $extension), E_USER_DEPRECATED);
++      if (!empty($configuration['driver'])) {
++        if (!empty($configuration['serve_' . $extension])) {
++          if ($has_assets_scheme) {
++            if (version_compare(\Drupal::VERSION, '11.0', '>=')) {
++              throw \Exception(sprintf('The serve_%s Flysystem Option has been removed for Drupal 11 compatibility. Use the assets:// instead.  See See https://www.drupal.org/node/3328126', $extension));
++            }
++            else {
++              @trigger_error(sprintf('The serve_%s Flysystem option is deprecated in flysystem:2.1.0 and is removed from flysystem:3.0.0. Use the assets:// stream wrapper instead. See https://www.drupal.org/node/3328126', $extension), E_USER_DEPRECATED);
++            }
++          }
+         }
+         // Don't break, the last configured one will win.
+         $extension_scheme = $scheme;
 diff --git a/src/Plugin/FlysystemUrlTrait.php b/src/Plugin/FlysystemUrlTrait.php
 index 17568dd..cd27f7c 100644
 --- a/src/Plugin/FlysystemUrlTrait.php
