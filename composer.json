@@ -118,10 +118,6 @@
         "patches": {
             "phpcompatibility/php-compatibility": {
                 "Fixing php 8.2 compatibility issue swith php-compatibility-sniffer":"patches/php-compatibility-sniffer-8.1-patch.patch"
-            },
-            "drupal/flysystem": {
-                "Refactor FlysystemStreamWrapper to remove extraneous code, exclude from test coverage": "patches/refactor-stream-wrapper-exclude-from-test-coverage.patch",
-                "Add tests for CSS/JS Optimizer Lazy classes": "patches/test-for-collection-optimizer-lazy.patch"
             }
         }
     },
