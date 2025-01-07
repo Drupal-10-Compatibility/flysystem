@@ -79,9 +79,6 @@
     </testsuite>
     <testsuite name="Flysystem Unit Test Suite">
       <directory>./web/modules/contrib/flysystem/tests/</directory>
-      <exclude>
-        ./web/modules/contrib/flysystem/tests/src/Kernel/CollectionOptimizerTest.php
-      </exclude>
     </testsuite>
   </testsuites>
   <listeners>
@@ -94,8 +91,6 @@
       <directory>./web/modules/contrib/flysystem</directory>
     </include>
     <exclude>
-      <file>./web/modules/contrib/flysystem/src/Asset/CssCollectionOptimizer.php</file>
-      <file>./web/modules/contrib/flysystem/src/Asset/JsCollectionOptimizer.php</file>
       <directory>./web/modules/contrib/flysystem/tests</directory>
       <directory suffix=".api.php">./web/modules/contrib/flysystem/**</directory>
     </exclude>
