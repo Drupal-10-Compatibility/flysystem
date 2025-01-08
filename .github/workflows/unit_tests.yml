@@ -65,13 +65,19 @@ jobs:
           echo ${{ env.SIMPLETEST_DB }}
           $(pwd)/vendor/bin/drush site-install standard --yes --account-pass=admin --db-url=$SIMPLETEST_DB
           $(pwd)/vendor/bin/drush en ${{env.MODULE}} --yes
+          $(pwd)/vendor/bin/drush en flysystem_s3 --yes
           $(pwd)/vendor/bin/drush config-set system.performance css.preprocess 0 --yes
           $(pwd)/vendor/bin/drush config-set system.performance js.preprocess 0 --yes
           $(pwd)/vendor/bin/drush config-set system.logging error_level all --yes
       - name: Start HTTP server for testing
         if: always()
         run:  $(pwd)/vendor/bin/drush runserver --default-server=builtin 8888 > /dev/null &       
-      - name: Run PHPUnit Tests
+      - name: Run PHPUnit Tests for Flysystem
         if: always()
         run: |
           $(pwd)/vendor/bin/phpunit -c $(pwd)/${{ env.DRUPAL_ROOT }}/core/phpunit.xml.dist --group=${{ env.MODULE }} $(pwd)/${{ env.DRUPAL_ROOT }}/modules/contrib/${{ env.MODULE }}
+      - name: Run PHPUnit Tests for Flysystem S3
+        if: always()
+        run: |
+          $(pwd)/vendor/bin/phpunit -c $(pwd)/${{ env.DRUPAL_ROOT }}/core/phpunit.xml.dist --group=flysystem_s3 $(pwd)/${{ env.DRUPAL_ROOT }}/modules/contrib/flysystem_s3
+  

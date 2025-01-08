@@ -71,7 +71,11 @@ jobs:
       - name: Start HTTP server for testing
         if: always()
         run:  $(pwd)/vendor/bin/drush runserver --default-server=builtin 8888 > /dev/null &       
-      - name: Run PHPUnit Test Coverage Analysis
+      - name: Run PHPUnit Test Coverage Analysis on Flysystem module
         if: always()
         run: |
           $(pwd)/vendor/bin/phpunit -c $(pwd)/phpunit.xml.dist --group=${{ env.MODULE }} $(pwd)/${{ env.DRUPAL_ROOT }}/modules/contrib/${{ env.MODULE }} --coverage-text
+      - name: Run PHPUnit Test Coverage Analysis on Flysystem S3 module
+        if: always()
+        run: |
+          $(pwd)/vendor/bin/phpunit -c $(pwd)/phpunit.xml.dist --group=${{ env.MODULE }} $(pwd)/${{ env.DRUPAL_ROOT }}/modules/contrib/flysystem_s3 --coverage-text

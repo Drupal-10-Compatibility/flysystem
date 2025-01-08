@@ -43,5 +43,7 @@ jobs:
       - name: Install Drupal with Composer
         run: composer update
       # Install Drupal for deprecation checking purposes
-      - name: Check for Drupal Coding Standards
+      - name: Check for Drupal Coding Standards for Flysystem
         run: $(pwd)/vendor/bin/phpcs -p ${{ env.DRUPAL_ROOT }}/modules/contrib/${{ env.MODULE }}
+      - name: Check for Drupal Coding Standards for Flysystem S3
+        run: $(pwd)/vendor/bin/phpcs -p ${{ env.DRUPAL_ROOT }}/modules/contrib/flysystem_s3
