@@ -2,14 +2,24 @@
 ## Description: Run installation sequences in the web container: composer install, drush site:install
 ## Usage: install
 ## Example: "ddev install"
+
+## Setting up the project array to enable projects during install
+readarray -t projects < <(awk -F',' '{ for( i=1; i<=NF; i++ ) print $i }' <<<"$PROJECT_NAMES")
 git config --global --add safe.directory /var/www/html
 echo "Installing composer dependencies (with development dependencies)."
 composer install --no-interaction --no-progress --apcu-autoloader || exit 1;
 echo "Composer packages are installed"
 
 echo "Running site installation."
+## Install the drupal site using the standard profile.
 drush -y si standard || exit 1;
-drush -y en $PROJECT_NAME || exit 1;
+
+## Enable the projects stored in the $PROJECT_NAMES environment variable.
+for i in "${projects[@]}"
+do
+  drush -y en $i || exit 1;
+done
+
 echo "Site installation is finished"
 
 drush uli
