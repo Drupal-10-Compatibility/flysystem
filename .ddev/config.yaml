@@ -14,8 +14,9 @@ nfs_mount_enabled: false
 mutagen_enabled: false
 use_dns_when_possible: true
 composer_version: "2"
+# git@git.drupal.org:project/flysystem.git 
 web_environment:
-  - PROJECT_NAMES=flysystem
+  - PROJECT_NAMES=flysystem,flysystem_s3,media,media_library
   - SIMPLETEST_DB=mysql://db:db@db:3306/db
   - SIMPLETEST_BASE_URL=https://web:443 
 

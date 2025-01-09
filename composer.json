@@ -12,15 +12,30 @@
         {
             "type": "composer",
             "url": "https://asset-packagist.org"
+        },
+        {
+            "type": "package",
+            "package": {
+                "name": "lhridley/flysystem-stream-wrapper",
+                "version": "dev-master",
+                "source": {
+                    "url": "https://github.com/lhridley/flysystem-stream-wrapper",
+                    "type": "git",
+                    "reference": "e42950b"
+                },
+                "replace": {
+                    "twistor/flysystem-stream-wrapper": "1.0.9"
+                }
+            }
         }
     ],
     "require": {
         "composer/installers": "^1.9",
         "cweagans/composer-patches": "^1.7",
-        "drupal/core": "^10.3",
-        "drupal/core-composer-scaffold": "^10.3",
-        "drupal/core-recommended": "^10.3",
-        "drupal/flysystem": "2.3.x-dev",
+        "drupal/core": "10.3.0",
+        "drupal/core-composer-scaffold": "10.3.0",
+        "drupal/core-recommended": "10.3.0",
+        "drupal/flysystem": "2.2.x-dev",
         "drupal/flysystem_s3": "2.1.x-dev",
         "drush/drush": "^13.3",
         "league/flysystem": "^1.0.3",
@@ -30,7 +45,7 @@
         "wikimedia/composer-merge-plugin": "^2.0"
     },
     "require-dev": {
-        "drupal/core-dev": "^10.3",
+        "drupal/core-dev": "10.3.0",
         "league/flysystem-memory": "^1.0",
         "phpcompatibility/php-compatibility": "8.1.0",
         "phpspec/prophecy": "~1.0",
@@ -38,6 +53,11 @@
     },
     "conflict": {
         "drupal/drupal": "*"
+    },
+    "autoload": {
+        "psr-4": {
+            "Twistor\\": ["vendor/lhridley/flysystem-stream-wrapper/src", "vendor/lhridley/stream-util/src"]
+        }
     },
     "minimum-stability": "dev",
     "prefer-stable": true,
@@ -121,6 +141,9 @@
         "patches": {
             "phpcompatibility/php-compatibility": {
                 "Fixing php 8.2 compatibility issues with php-compatibility-sniffer":"patches/php-compatibility-sniffer-8.1-patch.patch"
+            },
+            "drupal/flysystem": {
+                "Add Twistor libraries to project, fix namespaces": "https://git.drupalcode.org/project/flysystem/-/merge_requests/83.diff"
             }
         },
         "drupal-lenient": {
