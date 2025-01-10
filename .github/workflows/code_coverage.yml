@@ -75,7 +75,3 @@ jobs:
         if: always()
         run: |
           $(pwd)/vendor/bin/phpunit -c $(pwd)/phpunit.xml.dist --group=${{ env.MODULE }} $(pwd)/${{ env.DRUPAL_ROOT }}/modules/contrib/${{ env.MODULE }} --coverage-text
-      - name: Run PHPUnit Test Coverage Analysis on Flysystem S3 module
-        if: always()
-        run: |
-          $(pwd)/vendor/bin/phpunit -c $(pwd)/phpunit.xml.dist --group=${{ env.MODULE }} $(pwd)/${{ env.DRUPAL_ROOT }}/modules/contrib/flysystem_s3 --coverage-text

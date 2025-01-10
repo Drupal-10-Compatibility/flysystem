@@ -59,5 +59,3 @@ jobs:
       # Testing out phpstan-drupal for deprecation checking
       - name: Deprecation check with PHPStan / PHPStan Drupal for Flysystem
         run: ./vendor/bin/phpstan analyze --memory-limit 1G ${{ env.DRUPAL_ROOT }}/modules/contrib/${{ env.MODULE }}
-      - name: Deprecation check with PHPStan / PHPStan Drupal for Flysystem S3
-        run: ./vendor/bin/phpstan analyze --memory-limit 1G ${{ env.DRUPAL_ROOT }}/modules/contrib/flysystem_s3

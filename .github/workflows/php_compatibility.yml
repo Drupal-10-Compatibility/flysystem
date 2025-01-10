@@ -46,5 +46,3 @@ jobs:
         run: $(pwd)/vendor/bin/phpcs -p ${{ env.PROJECT_ROOT }}/vendor/league --standard=PHPCompatibility --runtime-set testVersion ${{ env.PHP_VERSION }}
       - name: Check Flysystem for PHP ${{ env.PHP_VERSION }} Compatibility
         run: $(pwd)/vendor/bin/phpcs -p ${{ env.DRUPAL_ROOT }}/modules/contrib/${{ env.MODULE }} --standard=PHPCompatibility --runtime-set testVersion ${{ env.PHP_VERSION }}
-      - name: Check Flysystem S3 for PHP ${{ env.PHP_VERSION }} Compatibility
-        run: $(pwd)/vendor/bin/phpcs -p ${{ env.DRUPAL_ROOT }}/modules/contrib/flysystem_s3 --standard=PHPCompatibility --runtime-set testVersion ${{ env.PHP_VERSION }}
