@@ -123,7 +123,6 @@
                 "Fixing php 8.2 compatibility issues with php-compatibility-sniffer":"patches/php-compatibility-sniffer-8.1-patch.patch"
             },
             "drupal/flysystem": {
-                "Fix phpstan issue identified on Unit test for Missing adapter": "patches/fix-phpstan-issue-with-missingtest.patch"
             }
         },
         "drupal-lenient": {
