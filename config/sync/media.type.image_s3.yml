@@ -1,0 +1,13 @@
+uuid: 4acba65f-6079-4177-b86e-c80cf617fb96
+langcode: en
+status: true
+dependencies: {  }
+id: image_s3
+label: 'Image (s3)'
+description: 'Use local images for reusable media, using Flysystem S3.'
+source: image
+queue_thumbnail_downloads: false
+new_revision: false
+source_configuration:
+  source_field: field_media_image_s3
+field_map: {  }

@@ -1,0 +1,27 @@
+uuid: c383ecb8-f214-4d48-bbc2-25a62728865b
+langcode: en
+status: true
+dependencies:
+  config:
+    - field.field.media.document_local.field_media_file_local
+    - media.type.document_local
+  module:
+    - file
+id: media.document_local.default
+targetEntityType: media
+bundle: document_local
+mode: default
+content:
+  field_media_file_local:
+    type: file_default
+    label: above
+    settings:
+      use_description_as_link_text: true
+    third_party_settings: {  }
+    weight: 0
+    region: content
+hidden:
+  created: true
+  name: true
+  thumbnail: true
+  uid: true

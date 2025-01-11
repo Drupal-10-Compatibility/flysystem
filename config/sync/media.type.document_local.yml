@@ -1,0 +1,13 @@
+uuid: 014da7a1-32ee-4656-b08d-8199d63d2785
+langcode: en
+status: true
+dependencies: {  }
+id: document_local
+label: 'Document Local'
+description: 'An uploaded file or document, such as a PDF, using Flysystem Local.'
+source: file
+queue_thumbnail_downloads: false
+new_revision: false
+source_configuration:
+  source_field: field_media_file_local
+field_map: {  }

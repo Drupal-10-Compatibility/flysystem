@@ -1,0 +1,13 @@
+uuid: e5da5a04-1880-46fc-a64e-85ee333c6301
+langcode: en
+status: true
+dependencies: {  }
+id: image_local
+label: 'Image (Local)'
+description: 'Use local images for reusable media, using Flysystem Local.'
+source: image
+queue_thumbnail_downloads: false
+new_revision: false
+source_configuration:
+  source_field: field_media_image_local
+field_map: {  }

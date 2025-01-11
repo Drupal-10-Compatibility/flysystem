@@ -1,0 +1,27 @@
+uuid: baff711b-1c54-466f-843b-3c74e213d137
+langcode: en
+status: true
+dependencies:
+  config:
+    - field.field.media.document_s3.field_media_file_s3
+    - media.type.document_s3
+  module:
+    - file
+id: media.document_s3.default
+targetEntityType: media
+bundle: document_s3
+mode: default
+content:
+  field_media_file_s3:
+    type: file_default
+    label: above
+    settings:
+      use_description_as_link_text: true
+    third_party_settings: {  }
+    weight: 1
+    region: content
+hidden:
+  created: true
+  name: true
+  thumbnail: true
+  uid: true

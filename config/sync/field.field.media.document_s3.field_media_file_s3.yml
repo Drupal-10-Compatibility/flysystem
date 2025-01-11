@@ -1,0 +1,27 @@
+uuid: ae3d4a41-ab1f-40bf-8596-96d460134059
+langcode: en
+status: true
+dependencies:
+  config:
+    - field.storage.media.field_media_file_s3
+    - media.type.document_s3
+  module:
+    - file
+id: media.document_s3.field_media_file_s3
+field_name: field_media_file_s3
+entity_type: media
+bundle: document_s3
+label: 'File (s3)'
+description: ''
+required: true
+translatable: false
+default_value: {  }
+default_value_callback: ''
+settings:
+  handler: 'default:file'
+  handler_settings: {  }
+  file_directory: '[date:custom:Y]-[date:custom:m]'
+  file_extensions: 'txt doc docx pdf'
+  max_filesize: ''
+  description_field: false
+field_type: file

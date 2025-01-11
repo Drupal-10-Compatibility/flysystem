@@ -1,0 +1,28 @@
+uuid: f21d550e-f606-4353-9670-35304e6d78aa
+langcode: en
+status: true
+dependencies:
+  config:
+    - core.entity_form_mode.media.media_library
+    - field.field.media.document_local.field_media_file_local
+    - media.type.document_local
+  module:
+    - file
+id: media.document_local.media_library
+targetEntityType: media
+bundle: document_local
+mode: media_library
+content:
+  field_media_file_local:
+    type: file_generic
+    weight: 0
+    region: content
+    settings:
+      progress_indicator: throbber
+    third_party_settings: {  }
+hidden:
+  created: true
+  name: true
+  path: true
+  status: true
+  uid: true

@@ -1,0 +1,30 @@
+uuid: 2ff743fc-1c2a-4650-87c8-e92365bda772
+langcode: en
+status: true
+dependencies:
+  config:
+    - field.field.media.image_s3.field_media_image_s3
+    - media.type.image_s3
+  module:
+    - image
+id: media.image_s3.default
+targetEntityType: media
+bundle: image_s3
+mode: default
+content:
+  field_media_image_s3:
+    type: image
+    label: above
+    settings:
+      image_link: ''
+      image_style: ''
+      image_loading:
+        attribute: lazy
+    third_party_settings: {  }
+    weight: 1
+    region: content
+hidden:
+  created: true
+  name: true
+  thumbnail: true
+  uid: true

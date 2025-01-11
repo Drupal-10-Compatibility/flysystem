@@ -1,0 +1,13 @@
+uuid: deeee048-bc14-4230-a924-de262370e204
+langcode: en
+status: true
+dependencies: {  }
+id: document_s3
+label: 'Document (S3)'
+description: 'An uploaded file or document, such as a PDF, using Flysystem S3.'
+source: file
+queue_thumbnail_downloads: false
+new_revision: false
+source_configuration:
+  source_field: field_media_file_s3
+field_map: {  }

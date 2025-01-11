@@ -1,0 +1,35 @@
+uuid: 9dda47bf-a006-4191-8a9a-808c9434b472
+langcode: en
+status: true
+dependencies:
+  config:
+    - core.entity_form_mode.media.media_library
+    - field.field.media.document_s3.field_media_file_s3
+    - media.type.document_s3
+  module:
+    - file
+id: media.document_s3.media_library
+targetEntityType: media
+bundle: document_s3
+mode: media_library
+content:
+  field_media_file_s3:
+    type: file_generic
+    weight: 0
+    region: content
+    settings:
+      progress_indicator: throbber
+    third_party_settings: {  }
+  name:
+    type: string_textfield
+    weight: 1
+    region: content
+    settings:
+      size: 60
+      placeholder: ''
+    third_party_settings: {  }
+hidden:
+  created: true
+  path: true
+  status: true
+  uid: true

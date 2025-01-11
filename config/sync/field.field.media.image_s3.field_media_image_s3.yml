@@ -1,0 +1,38 @@
+uuid: dc4adfd7-3e98-48b1-9071-58efbeb5b4af
+langcode: en
+status: true
+dependencies:
+  config:
+    - field.storage.media.field_media_image_s3
+    - media.type.image_s3
+  module:
+    - image
+id: media.image_s3.field_media_image_s3
+field_name: field_media_image_s3
+entity_type: media
+bundle: image_s3
+label: 'Image (s3)'
+description: ''
+required: true
+translatable: false
+default_value: {  }
+default_value_callback: ''
+settings:
+  handler: 'default:file'
+  handler_settings: {  }
+  file_directory: '[date:custom:Y]-[date:custom:m]'
+  file_extensions: 'png gif jpg jpeg webp'
+  max_filesize: ''
+  max_resolution: ''
+  min_resolution: ''
+  alt_field: false
+  alt_field_required: true
+  title_field: false
+  title_field_required: false
+  default_image:
+    uuid: ''
+    alt: ''
+    title: ''
+    width: null
+    height: null
+field_type: image

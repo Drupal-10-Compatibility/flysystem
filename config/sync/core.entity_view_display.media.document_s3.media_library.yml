@@ -1,0 +1,32 @@
+uuid: 965fb891-2405-49a4-921d-a62e8fa728b4
+langcode: en
+status: true
+dependencies:
+  config:
+    - core.entity_view_mode.media.media_library
+    - field.field.media.document_s3.field_media_file_s3
+    - image.style.medium
+    - media.type.document_s3
+  module:
+    - image
+id: media.document_s3.media_library
+targetEntityType: media
+bundle: document_s3
+mode: media_library
+content:
+  thumbnail:
+    type: image
+    label: hidden
+    settings:
+      image_link: ''
+      image_style: medium
+      image_loading:
+        attribute: lazy
+    third_party_settings: {  }
+    weight: 0
+    region: content
+hidden:
+  created: true
+  field_media_file_s3: true
+  name: true
+  uid: true
