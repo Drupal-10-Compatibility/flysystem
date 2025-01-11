@@ -57,7 +57,7 @@ jobs:
           restore-keys: ${{ runner.os }}-composer-
       # Create new drupal project with Composer install
       - name: Install Drupal with Composer
-        run: composer update
+        run: composer install -o
       # Install Drupal for phpunit tests
       - name: Install Drupal site for phpunit testing
         if: always()

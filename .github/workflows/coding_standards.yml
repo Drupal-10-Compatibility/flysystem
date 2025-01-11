@@ -41,7 +41,7 @@ jobs:
           restore-keys: ${{ runner.os }}-composer-
       # Create new drupal project with Composer install
       - name: Install Drupal with Composer
-        run: composer update
+        run: composer install -o
       # Install Drupal for deprecation checking purposes
       - name: Check for Drupal Coding Standards for Flysystem
         run: $(pwd)/vendor/bin/phpcs -p ${{ env.DRUPAL_ROOT }}/modules/contrib/${{ env.MODULE }}

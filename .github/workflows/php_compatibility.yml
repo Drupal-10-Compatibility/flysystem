@@ -41,7 +41,7 @@ jobs:
           restore-keys: ${{ runner.os }}-composer-
       # Create new drupal project with Composer install
       - name: Install Drupal with Composer
-        run: composer update
+        run: composer install -o
       - name: Check League libraries for PHP ${{ env.PHP_VERSION }} Compatibility
         run: $(pwd)/vendor/bin/phpcs -p ${{ env.PROJECT_ROOT }}/vendor/league --standard=PHPCompatibility --runtime-set testVersion ${{ env.PHP_VERSION }}
       - name: Check Flysystem for PHP ${{ env.PHP_VERSION }} Compatibility

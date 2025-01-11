@@ -55,7 +55,7 @@ jobs:
           restore-keys: ${{ runner.os }}-composer-
       # Create new drupal project with Composer install
       - name: Install Drupal with Composer
-        run: composer update
+        run: composer install -o
       # Testing out phpstan-drupal for deprecation checking
       - name: Deprecation check with PHPStan / PHPStan Drupal for Flysystem
         run: ./vendor/bin/phpstan analyze --memory-limit 1G ${{ env.DRUPAL_ROOT }}/modules/contrib/${{ env.MODULE }}
