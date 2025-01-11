@@ -1,7 +1,8 @@
 #!/bin/bash
-## Description: Run a static analysis on the project with phpstan (run `ddev install` first)
-## Usage: static-analyze
-## Example: "ddev static-analyze"
+## Description: Reports unit test coverage statistics
+## Usage: test-coverage
+## Example: "ddev test-coverage"
+
 readarray -t projects < <(awk -F',' '{ for( i=1; i<=NF; i++ ) print $i }' <<<"$PROJECT_NAMES")
 delete=media
 projects=( "${projects[@]/$delete}" )
@@ -10,5 +11,5 @@ projects=( "${projects[@]/$delete}" )
 ## Enable the projects stored in the $PROJECT_NAMES environment variable.
 for i in "${projects[@]}"
 do
-  /var/www/html/vendor/bin/phpstan analyze --memory-limit 1G $DDEV_DOCROOT/modules/contrib/$i
+  /var/www/html/vendor/bin/phpunit -c /var/www/html/$DDEV_DOCROOT/core/phpunit.xml.dist --group=$i /var/www/html/$DDEV_DOCROOT/modules/contrib/$i --coverage-text
 done
