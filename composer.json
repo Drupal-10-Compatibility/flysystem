@@ -143,7 +143,10 @@
                 "Fixing php 8.2 compatibility issues with php-compatibility-sniffer":"patches/php-compatibility-sniffer-8.1-patch.patch"
             },
             "drupal/flysystem": {
-                "Add Twistor libraries to project, fix namespaces": "https://git.drupalcode.org/project/flysystem/-/merge_requests/83.diff"
+                "Add Twistor libraries to project, fix namespaces": "patches/twistor-streamwrapper.patch",
+                "Static Analysis Ignores for deprecations & Drupal static calls": "patches/twistor-static-analsyis-ignores.patch",
+                "Automated coding standards fixes": "patches/twistor-coding-standards-automated-fixes.patch",
+                "And yet more coding standards and static analysis patching":"patches/twistor-and-yet-coding-standards-static-analysis-final.patch"
             }
         },
         "drupal-lenient": {

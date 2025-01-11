@@ -1,0 +1,153 @@
+diff --git a/src/Asset/AssetDumper.php b/src/Asset/AssetDumper.php
+index d4d90dd..52a272a 100644
+--- a/src/Asset/AssetDumper.php
++++ b/src/Asset/AssetDumper.php
+@@ -40,7 +40,7 @@ class AssetDumper extends DrupalAssetDumper {
+     // aren't working can set css.gzip to FALSE in order to skip
+     // generating a file that won't be used.
+     // @phpstan-ignore-line
+-    if (extension_loaded('zlib') && \Drupal::config('system.performance')->get($file_extension . '.gzip')) {
++    if (extension_loaded('zlib') && \Drupal::config('system.performance')->get($file_extension . '.gzip')) {// @phpstan-ignore-line @codingStandardsIgnoreLine
+       if (!file_exists($uri . '.gz') && !$this->fileSystem->saveData(gzencode($data, 9, FORCE_GZIP), $uri . '.gz', FileExists::Replace)) {
+         return FALSE;
+       }
+diff --git a/src/Asset/CssCollectionOptimizer.php b/src/Asset/CssCollectionOptimizer.php
+index 4a9b693..5bdaa9d 100644
+--- a/src/Asset/CssCollectionOptimizer.php
++++ b/src/Asset/CssCollectionOptimizer.php
+@@ -8,10 +8,7 @@ use Drupal\Core\Logger\LoggerChannelTrait;
+ /**
+  * Optimizes CSS assets.
+  */
+-/**
+- * @phpstan-ignore-line
+- */
+-class CssCollectionOptimizer extends DrupalCssCollectionOptimizer {
++class CssCollectionOptimizer extends DrupalCssCollectionOptimizer { // @phpstan-ignore-line @codingStandardsIgnoreLine
+ 
+ 
+   use SchemeExtensionTrait;
+@@ -26,16 +23,13 @@ class CssCollectionOptimizer extends DrupalCssCollectionOptimizer {
+     $file_system = $this->fileSystem;
+     $delete_stale = static function ($uri) use ($file_system) {
+       // Default stale file threshold is 30 days (2592000 seconds).
+-      // @phpstan-ignore-line
+-      $stale_file_threshold = \Drupal::config('system.performance')->get('stale_file_threshold') ?? 2592000;
+-      // @phpstan-ignore-line
+-      if (\Drupal::time()->getRequestTime() - filemtime($uri) > $stale_file_threshold) {
++      $stale_file_threshold = \Drupal::config('system.performance')->get('stale_file_threshold') ?? 2592000; // @phpstan-ignore-line @codingStandardsIgnoreLine
++      if (\Drupal::time()->getRequestTime() - filemtime($uri) > $stale_file_threshold) {// @phpstan-ignore-line @codingStandardsIgnoreLine
+         try {
+           $file_system->delete($uri);
+         }
+         catch (\Exception $e) {
+-          // @phpstan-ignore-line
+-          \Drupal::service('logger.factory')->get('flysystem')->error($e->getMessage());
++          \Drupal::service('logger.factory')->get('flysystem')->error($e->getMessage()); // @phpstan-ignore-line @codingStandardsIgnoreLine
+         }
+       }
+     };
+diff --git a/src/Asset/CssCollectionOptimizerLazy.php b/src/Asset/CssCollectionOptimizerLazy.php
+index 25ed5fb..767b66f 100644
+--- a/src/Asset/CssCollectionOptimizerLazy.php
++++ b/src/Asset/CssCollectionOptimizerLazy.php
+@@ -21,7 +21,7 @@ class CssCollectionOptimizerLazy extends DrupalCssCollectionOptimizerLazy {
+     }
+     catch (FileException $fileException) {
+       // @phpstan-ignore-line
+-      \Drupal::logger('flysystem')->error($fileException->getMessage());
++      \Drupal::logger('flysystem')->error($fileException->getMessage());// @phpstan-ignore-line @codingStandardsIgnoreLine
+     }
+   }
+ 
+diff --git a/src/Asset/CssOptimizer.php b/src/Asset/CssOptimizer.php
+index 6ff4dec..89ed747 100644
+--- a/src/Asset/CssOptimizer.php
++++ b/src/Asset/CssOptimizer.php
+@@ -14,7 +14,7 @@ class CssOptimizer extends DrupalCssOptimizer {
+   /**
+    * {@inheritdoc}
+    */
+-  public function rewriteFileURI($matches): string {
++  public function rewriteFileURI($matches): string { // @codingStandardsIgnoreLine
+     // Prefix with base and remove '../' segments where possible.
+     $path = $this->rewriteFileURIBasePath . $matches[1];
+     $last = '';
+diff --git a/src/Asset/JsCollectionOptimizer.php b/src/Asset/JsCollectionOptimizer.php
+index 61753a4..f923482 100644
+--- a/src/Asset/JsCollectionOptimizer.php
++++ b/src/Asset/JsCollectionOptimizer.php
+@@ -8,11 +8,7 @@ use Drupal\Core\Logger\LoggerChannelTrait;
+ /**
+  * Optimizes JavaScript assets.
+  */
+-/**
+- * @phpstan-ignore-line
+- */
+-class JsCollectionOptimizer extends DrupalJsCollectionOptimizer {
+-
++class JsCollectionOptimizer extends DrupalJsCollectionOptimizer {// @phpstan-ignore-line @codingStandardsIgnoreLine
+ 
+   use SchemeExtensionTrait;
+   use LoggerChannelTrait;
+@@ -26,16 +22,13 @@ class JsCollectionOptimizer extends DrupalJsCollectionOptimizer {
+     $file_system = $this->fileSystem;
+     $delete_stale = static function ($uri) use ($file_system) {
+       // Default stale file threshold is 30 days (2592000 seconds).
+-      // @phpstan-ignore-line
+-      $stale_file_threshold = \Drupal::config('system.performance')->get('stale_file_threshold') ?? 2592000;
+-      // @phpstan-ignore-line
+-      if (\Drupal::time()->getRequestTime() - filemtime($uri) > $stale_file_threshold) {
++      $stale_file_threshold = \Drupal::config('system.performance')->get('stale_file_threshold') ?? 2592000;// @phpstan-ignore-line @codingStandardsIgnoreLine
++      if (\Drupal::time()->getRequestTime() - filemtime($uri) > $stale_file_threshold) {// @phpstan-ignore-line @codingStandardsIgnoreLine
+         try {
+           $file_system->delete($uri);
+         }
+         catch (\Exception $e) {
+-          // @phpstan-ignore-line
+-          \Drupal::service('logger.factory')->get('flysystem')->error($e->getMessage());
++          \Drupal::service('logger.factory')->get('flysystem')->error($e->getMessage());// @phpstan-ignore-line @codingStandardsIgnoreLine
+         }
+       }
+     };
+diff --git a/src/Asset/JsCollectionOptimizerLazy.php b/src/Asset/JsCollectionOptimizerLazy.php
+index e703dbf..f28094b 100644
+--- a/src/Asset/JsCollectionOptimizerLazy.php
++++ b/src/Asset/JsCollectionOptimizerLazy.php
+@@ -21,7 +21,7 @@ class JsCollectionOptimizerLazy extends DrupalJsCollectionOptimizerLazy {
+     }
+     catch (FileException $fileException) {
+       // @phpstan-ignore-line
+-      \Drupal::logger('flysystem')->error($fileException->getMessage());
++      \Drupal::logger('flysystem')->error($fileException->getMessage());// @phpstan-ignore-line @codingStandardsIgnoreLine
+     }
+   }
+ 
+diff --git a/tests/src/Unit/FlysystemServiceProviderTest.php b/tests/src/Unit/FlysystemServiceProviderTest.php
+index e241548..759f677 100644
+--- a/tests/src/Unit/FlysystemServiceProviderTest.php
++++ b/tests/src/Unit/FlysystemServiceProviderTest.php
+@@ -97,12 +97,10 @@ class FlysystemServiceProviderTest extends UnitTestCase {
+     (new FlysystemServiceProvider())->register($this->container);
+     $this->assertSame(AssetDumper::class, $this->container->getDefinition('asset.js.dumper')->getClass());
+ 
+-    // @phpstan-ignore-line
+-    $this->container->register('asset.js.collection_optimizer', JsCollectionOptimizer::class);
++    $this->container->register('asset.js.collection_optimizer', JsCollectionOptimizer::class);// @phpstan-ignore-line @codingStandardsIgnoreLine
+     (new FlysystemServiceProvider())->register($this->container);
+     $this->assertSame(AssetDumper::class, $this->container->getDefinition('asset.js.dumper')->getClass());
+-    // @phpstan-ignore-line
+-    $this->assertSame(JsCollectionOptimizer::class, $this->container->getDefinition('asset.js.collection_optimizer')->getClass());
++    $this->assertSame(JsCollectionOptimizer::class, $this->container->getDefinition('asset.js.collection_optimizer')->getClass());// @phpstan-ignore-line @codingStandardsIgnoreLine
+ 
+     // A successful swap.
+     new Settings([
+@@ -125,7 +123,7 @@ class FlysystemServiceProviderTest extends UnitTestCase {
+     // Test swapping the asset dumper.
+     $this->container->register('asset.css.dumper', AssetDumper::class);
+     // @phpstan-ignore-line
+-    $this->container->register('asset.css.collection_optimizer', CssCollectionOptimizer::class);
++    $this->container->register('asset.css.collection_optimizer', CssCollectionOptimizer::class);// @phpstan-ignore-line @codingStandardsIgnoreLine
+     $this->container->register('asset.css.optimizer', CssOptimizer::class);
+ 
+     new Settings([

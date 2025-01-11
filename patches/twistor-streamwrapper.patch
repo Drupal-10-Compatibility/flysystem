@@ -1,18 +1,168 @@
-composer.json
-flysystem.install
-src/FlysystemBridge.php
-src/Twistor/Flysystem/Exception/DirectoryExistsException.php
-src/Twistor/Flysystem/Exception/DirectoryNotEmptyException.php
-src/Twistor/Flysystem/Exception/NotADirectoryException.php
-src/Twistor/Flysystem/Exception/TriggerErrorException.php
-src/Twistor/Flysystem/Plugin/AbstractPlugin.php
-src/Twistor/Flysystem/Plugin/ForcedRename.php
-src/Twistor/Flysystem/Plugin/Mkdir.php
-src/Twistor/Flysystem/Plugin/Rmdir.php
-src/Twistor/Flysystem/Plugin/Stat.php
-src/Twistor/Flysystem/Plugin/Touch.php
-src/Twistor/FlysystemStreamWrapper.php
-src/Twistor/PosixUid.php
-src/Twistor/StreamUtil.php
-src/Twistor/Uid.php
-tests/src/Unit/InstallFunctionsTest.php
+diff --git a/composer.json b/composer.json
+index 201357d..c852a7d 100644
+--- a/composer.json
++++ b/composer.json
+@@ -4,7 +4,6 @@
+   "require": {
+     "league/flysystem": "^1.0.3",
+     "league/flysystem-replicate-adapter": "~1.0",
+-    "twistor/flysystem-stream-wrapper": "^1.0.5",
+     "php": ">=8.1"
+   },
+   "require-dev": {
+diff --git a/flysystem.install b/flysystem.install
+index b507919..397c456 100644
+--- a/flysystem.install
++++ b/flysystem.install
+@@ -58,7 +58,7 @@ function __flysystem_check_dependencies(array &$requirements) {
+   $dependencies = [
+     'League\Flysystem\Filesystem' => \Drupal::translation()->translate('Flysystem'),
+     'League\Flysystem\Replicate\ReplicateAdapter' => \Drupal::translation()->translate('replicate adapter'),
+-    'Twistor\FlysystemStreamWrapper' => \Drupal::translation()->translate('stream wrapper'),
++    'Drupal\flysystem\Twistor\FlysystemStreamWrapper' => \Drupal::translation()->translate('stream wrapper'),
+   ];
+ 
+   $missing = array_filter(array_map(function ($dependency) use ($dependencies) {
+diff --git a/flysystem.module b/flysystem.module
+index d6a1589..e9fb943 100644
+--- a/flysystem.module
++++ b/flysystem.module
+@@ -49,33 +49,34 @@ function flysystem_file_download($uri) {
+ 
+ /**
+  * Implements hook_entity_access().
++ *
+  * @see Drupal\file\FileAccessControlHandler
+  */
+ function flysystem_entity_access(EntityInterface $entity, $operation, AccountInterface $account) {
+-    if (!$entity instanceof FileInterface) {
+-        return AccessResult::neutral();
+-    }
++  if (!$entity instanceof FileInterface) {
++    return AccessResult::neutral();
++  }
+ 
+-    if (!in_array($operation, ['download', 'view'])) {
+-        return AccessResult::neutral();
+-    }
++  if (!in_array($operation, ['download', 'view'])) {
++    return AccessResult::neutral();
++  }
+ 
+-    $schemes = Drupal::service('flysystem_factory')->getSchemes();
+-    $scheme = StreamWrapperManager::getScheme($entity->getFileUri());
++  $schemes = Drupal::service('flysystem_factory')->getSchemes();
++  $scheme = StreamWrapperManager::getScheme($entity->getFileUri());
+ 
+-    if (!$scheme || !in_array($scheme, $schemes, TRUE)) {
+-        return AccessResult::neutral();
+-    }
++  if (!$scheme || !in_array($scheme, $schemes, TRUE)) {
++    return AccessResult::neutral();
++  }
+ 
+-    $settings = Settings::get('flysystem', []);
++  $settings = Settings::get('flysystem', []);
+ 
+-    if (empty($settings[$scheme]['config']['public'])) {
+-        return AccessResult::neutral();
+-    }
++  if (empty($settings[$scheme]['config']['public'])) {
++    return AccessResult::neutral();
++  }
+ 
+-    if ($operation === 'download') {
+-        return AccessResult::allowed();
+-    }
++  if ($operation === 'download') {
++    return AccessResult::allowed();
++  }
+ 
+-    return AccessResult::allowedIfHasPermission($account, 'access content');
++  return AccessResult::allowedIfHasPermission($account, 'access content');
+ }
+diff --git a/src/Asset/CssCollectionOptimizerLazy.php b/src/Asset/CssCollectionOptimizerLazy.php
+index ace03d0..2e1bfff 100644
+--- a/src/Asset/CssCollectionOptimizerLazy.php
++++ b/src/Asset/CssCollectionOptimizerLazy.php
+@@ -18,7 +18,8 @@ class CssCollectionOptimizerLazy extends DrupalCssCollectionOptimizerLazy {
+   public function deleteAll() {
+     try {
+       $this->fileSystem->deleteRecursive($this->getSchemeForExtension('css') . '://css');
+-    } catch (FileException $fileException) {
++    }
++    catch (FileException $fileException) {
+       \Drupal::logger('flysystem')->error($fileException->getMessage());
+     }
+   }
+diff --git a/src/Asset/JsCollectionOptimizerLazy.php b/src/Asset/JsCollectionOptimizerLazy.php
+index 33ed3c4..385e626 100644
+--- a/src/Asset/JsCollectionOptimizerLazy.php
++++ b/src/Asset/JsCollectionOptimizerLazy.php
+@@ -18,7 +18,8 @@ class JsCollectionOptimizerLazy extends DrupalJsCollectionOptimizerLazy {
+   public function deleteAll() {
+     try {
+       $this->fileSystem->deleteRecursive($this->getSchemeForExtension('js') . '://js');
+-    } catch (FileException $fileException) {
++    }
++    catch (FileException $fileException) {
+       \Drupal::logger('flysystem')->error($fileException->getMessage());
+     }
+   }
+diff --git a/src/FlysystemBridge.php b/src/FlysystemBridge.php
+index 1f4dbce..b4c2f48 100644
+--- a/src/FlysystemBridge.php
++++ b/src/FlysystemBridge.php
+@@ -5,7 +5,7 @@ namespace Drupal\flysystem;
+ use Drupal\Core\StreamWrapper\StreamWrapperInterface;
+ use Drupal\Core\StringTranslation\StringTranslationTrait;
+ use League\Flysystem\Util;
+-use Twistor\FlysystemStreamWrapper;
++use Drupal\flysystem\Twistor\FlysystemStreamWrapper;
+ 
+ /**
+  * An adapter for Flysystem to StreamWrapperInterface.
+diff --git a/src/Routing/FlysystemRoutes.php b/src/Routing/FlysystemRoutes.php
+index d1ad705..d483812 100644
+--- a/src/Routing/FlysystemRoutes.php
++++ b/src/Routing/FlysystemRoutes.php
+@@ -99,7 +99,7 @@ class FlysystemRoutes implements ContainerInjectionInterface {
+           '_access' => 'TRUE',
+         ],
+         [
+-          '_maintenance_access' => 'TRUE'
++          '_maintenance_access' => 'TRUE',
+         ]
+       );
+ 
+@@ -116,7 +116,7 @@ class FlysystemRoutes implements ContainerInjectionInterface {
+             '_access' => 'TRUE',
+           ],
+           [
+-            '_maintenance_access' => 'TRUE'
++            '_maintenance_access' => 'TRUE',
+           ]
+         );
+       }
+@@ -135,7 +135,7 @@ class FlysystemRoutes implements ContainerInjectionInterface {
+           'scheme' => '^[a-zA-Z0-9+.-]+$',
+         ],
+         [
+-          '_maintenance_access' => 'TRUE'
++          '_maintenance_access' => 'TRUE',
+         ]
+       );
+     }
+diff --git a/tests/src/Unit/InstallFunctionsTest.php b/tests/src/Unit/InstallFunctionsTest.php
+index cdbe926..2e8ca44 100644
+--- a/tests/src/Unit/InstallFunctionsTest.php
++++ b/tests/src/Unit/InstallFunctionsTest.php
+@@ -7,7 +7,7 @@ use Drupal\Core\Site\Settings;
+ use Drupal\flysystem\FlysystemFactory;
+ use Drupal\Tests\UnitTestCase;
+ use Symfony\Component\DependencyInjection\ContainerBuilder;
+-use Twistor\FlysystemStreamWrapper;
++use Drupal\flysystem\Twistor\FlysystemStreamWrapper;
+ 
+ /**
+  * Tests flysystem.install functions.
