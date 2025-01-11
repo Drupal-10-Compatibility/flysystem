@@ -126,30 +126,3 @@ index 385e626..c7f29af 100644
 +      \Drupal::logger('flysystem')->error($fileException->getMessage());// @phpstan-ignore-line @codingStandardsIgnoreLine 
      }
    }
- 
-diff --git a/tests/src/Unit/FlysystemServiceProviderTest.php b/tests/src/Unit/FlysystemServiceProviderTest.php
-index 02a16a0..8fbec1a 100644
---- a/tests/src/Unit/FlysystemServiceProviderTest.php
-+++ b/tests/src/Unit/FlysystemServiceProviderTest.php
-@@ -97,10 +97,10 @@ class FlysystemServiceProviderTest extends UnitTestCase {
-     (new FlysystemServiceProvider())->register($this->container);
-     $this->assertSame(AssetDumper::class, $this->container->getDefinition('asset.js.dumper')->getClass());
- 
--    $this->container->register('asset.js.collection_optimizer', JsCollectionOptimizer::class);
-+    $this->container->register('asset.js.collection_optimizer', JsCollectionOptimizer::class);// @phpstan-ignore-line @codingStandardsIgnoreLine 
-     (new FlysystemServiceProvider())->register($this->container);
-     $this->assertSame(AssetDumper::class, $this->container->getDefinition('asset.js.dumper')->getClass());
--    $this->assertSame(JsCollectionOptimizer::class, $this->container->getDefinition('asset.js.collection_optimizer')->getClass());
-+    $this->assertSame(JsCollectionOptimizer::class, $this->container->getDefinition('asset.js.collection_optimizer')->getClass());// @phpstan-ignore-line @codingStandardsIgnoreLine 
- 
-     // A successful swap.
-     new Settings([
-@@ -122,7 +122,7 @@ class FlysystemServiceProviderTest extends UnitTestCase {
-   public function testSwappingCssServices() {
-     // Test swapping the asset dumper.
-     $this->container->register('asset.css.dumper', AssetDumper::class);
--    $this->container->register('asset.css.collection_optimizer', CssCollectionOptimizer::class);
-+    $this->container->register('asset.css.collection_optimizer', CssCollectionOptimizer::class);// @phpstan-ignore-line @codingStandardsIgnoreLine 
-     $this->container->register('asset.css.optimizer', CssOptimizer::class);
- 
-     new Settings([

@@ -1,0 +1,171 @@
+diff --git a/tests/src/Kernel/CollectionOptimizerTest.php b/tests/src/Kernel/CollectionOptimizerTest.php
+index 9fb14f7..04c7877 100644
+--- a/tests/src/Kernel/CollectionOptimizerTest.php
++++ b/tests/src/Kernel/CollectionOptimizerTest.php
+@@ -3,8 +3,8 @@
+ namespace Drupal\Tests\flysystem\Kernel;
+ 
+ use Drupal\Core\Asset\AssetCollectionGrouperInterface;
++use Drupal\Core\Asset\AssetOptimizerInterface;
+ use Drupal\Core\Asset\CssOptimizer;
+-use Drupal\Core\Asset\JsOptimizer;
+ use Drupal\Core\State\StateInterface;
+ use Drupal\flysystem\Asset\AssetDumper;
+ use Drupal\flysystem\Asset\CssCollectionOptimizer;
+@@ -32,6 +32,13 @@ class CollectionOptimizerTest extends KernelTestBase {
+    */
+   protected $fileUrlGenerator;
+ 
++  /**
++   * DateTime service.
++   *
++   * @var Drupal\Component\Datetime\TimeInterface
++   */
++  protected $time;
++
+   /**
+    * {@inheritdoc}
+    */
+@@ -75,8 +82,8 @@ class CollectionOptimizerTest extends KernelTestBase {
+     $grouper = $this->prophesize(AssetCollectionGrouperInterface::class);
+     $dumper = $this->prophesize(AssetDumper::class);
+     $state = $this->prophesize(StateInterface::class);
+-
+-    $optimizer = new JsCollectionOptimizer($grouper->reveal(), new JsOptimizer(), $dumper->reveal(), $state->reveal(), $this->container->get('file_system'));
++    $js_optimizer = $this->prophesize(AssetOptimizerInterface::class);
++    $optimizer = new JsCollectionOptimizer($grouper->reveal(), $js_optimizer->reveal(), $dumper->reveal(), $state->reveal(), $this->container->get('file_system'));
+     $optimizer->deleteAll();
+ 
+     foreach ($this->jsFilesUnderTest() as $js_file => $expired) {
+diff --git a/tests/src/Unit/Flysystem/Adapter/CacheItemBackendTest.php b/tests/src/Unit/Flysystem/Adapter/CacheItemBackendTest.php
+index 6c23567..dcb47f6 100644
+--- a/tests/src/Unit/Flysystem/Adapter/CacheItemBackendTest.php
++++ b/tests/src/Unit/Flysystem/Adapter/CacheItemBackendTest.php
+@@ -2,6 +2,7 @@
+ 
+ namespace Drupal\Tests\flysystem\Unit\Flysystem\Adapter;
+ 
++use Drupal\Component\Datetime\TimeInterface;
+ use Drupal\Core\Cache\MemoryBackend;
+ use Drupal\flysystem\Flysystem\Adapter\CacheItem;
+ use Drupal\flysystem\Flysystem\Adapter\CacheItemBackend;
+@@ -36,7 +37,8 @@ class CacheItemBackendTest extends UnitTestCase {
+    */
+   public function setUp(): void {
+     parent::setUp();
+-    $this->cacheBackend = new MemoryBackend('foo');
++    $time = $this->prophesize(TimeInterface::class)->reveal();
++    $this->cacheBackend = new MemoryBackend($time);
+     $this->cacheItemBackend = new CacheItemBackend('test-scheme', $this->cacheBackend);
+   }
+ 
+diff --git a/tests/src/Unit/Flysystem/Adapter/DrupalCacheAdapterTest.php b/tests/src/Unit/Flysystem/Adapter/DrupalCacheAdapterTest.php
+index 0b6d04e..aba07ac 100644
+--- a/tests/src/Unit/Flysystem/Adapter/DrupalCacheAdapterTest.php
++++ b/tests/src/Unit/Flysystem/Adapter/DrupalCacheAdapterTest.php
+@@ -2,6 +2,7 @@
+ 
+ namespace Drupal\Tests\flysystem\Unit\Flysystem\Adapter;
+ 
++use Drupal\Component\Datetime\TimeInterface;
+ use Drupal\Core\Cache\MemoryBackend;
+ use Drupal\flysystem\Flysystem\Adapter\CacheItemBackend;
+ use Drupal\flysystem\Flysystem\Adapter\DrupalCacheAdapter;
+@@ -59,7 +60,8 @@ class DrupalCacheAdapterTest extends UnitTestCase {
+    */
+   public function setUp(): void {
+     parent::setUp();
+-    $this->cacheItemBackend = new CacheItemBackend(static::SCHEME, new MemoryBackend('foo'));
++    $time = $this->prophesize(TimeInterface::class);
++    $this->cacheItemBackend = new CacheItemBackend(static::SCHEME, new MemoryBackend($time->reveal()));
+     $this->adapter = $this->prophesize(AdapterInterface::class);
+     $this->cacheAdapter = new DrupalCacheAdapter(static::SCHEME, $this->adapter->reveal(), $this->cacheItemBackend);
+   }
+@@ -247,24 +249,24 @@ class DrupalCacheAdapterTest extends UnitTestCase {
+    * Tests reading a file.
+    */
+   public function testRead() {
+-    $this->adapter->read(static::FILE)->willReturn(TRUE);
+-    $this->assertTrue($this->cacheAdapter->read(static::FILE));
++    $this->adapter->read(static::FILE)->willReturn([]);
++    $this->assertIsArray($this->cacheAdapter->read(static::FILE));
+   }
+ 
+   /**
+    * Tests reading a stream.
+    */
+   public function testReadStream() {
+-    $this->adapter->readStream(static::FILE)->willReturn(TRUE);
+-    $this->assertTrue($this->cacheAdapter->readStream(static::FILE));
++    $this->adapter->readStream(static::FILE)->willReturn([]);
++    $this->assertIsArray($this->cacheAdapter->readStream(static::FILE));
+   }
+ 
+   /**
+    * Tests listing contents of a directory.
+    */
+   public function testListContentsSuccess() {
+-    $this->adapter->listContents('testdir', TRUE)->willReturn(TRUE);
+-    $this->assertTrue($this->cacheAdapter->listContents('testdir', TRUE));
++    $this->adapter->listContents('testdir', TRUE)->willReturn([]);
++    $this->assertIsArray($this->cacheAdapter->listContents('testdir', TRUE));
+   }
+ 
+   /**
+diff --git a/tests/src/Unit/FlysystemServiceProviderTest.php b/tests/src/Unit/FlysystemServiceProviderTest.php
+index 02a16a0..8fbec1a 100644
+--- a/tests/src/Unit/FlysystemServiceProviderTest.php
++++ b/tests/src/Unit/FlysystemServiceProviderTest.php
+@@ -97,10 +97,10 @@ class FlysystemServiceProviderTest extends UnitTestCase {
+     (new FlysystemServiceProvider())->register($this->container);
+     $this->assertSame(AssetDumper::class, $this->container->getDefinition('asset.js.dumper')->getClass());
+ 
+-    $this->container->register('asset.js.collection_optimizer', JsCollectionOptimizer::class);
++    $this->container->register('asset.js.collection_optimizer', JsCollectionOptimizer::class);// @phpstan-ignore-line @codingStandardsIgnoreLine 
+     (new FlysystemServiceProvider())->register($this->container);
+     $this->assertSame(AssetDumper::class, $this->container->getDefinition('asset.js.dumper')->getClass());
+-    $this->assertSame(JsCollectionOptimizer::class, $this->container->getDefinition('asset.js.collection_optimizer')->getClass());
++    $this->assertSame(JsCollectionOptimizer::class, $this->container->getDefinition('asset.js.collection_optimizer')->getClass());// @phpstan-ignore-line @codingStandardsIgnoreLine 
+ 
+     // A successful swap.
+     new Settings([
+@@ -122,7 +122,7 @@ class FlysystemServiceProviderTest extends UnitTestCase {
+   public function testSwappingCssServices() {
+     // Test swapping the asset dumper.
+     $this->container->register('asset.css.dumper', AssetDumper::class);
+-    $this->container->register('asset.css.collection_optimizer', CssCollectionOptimizer::class);
++    $this->container->register('asset.css.collection_optimizer', CssCollectionOptimizer::class);// @phpstan-ignore-line @codingStandardsIgnoreLine 
+     $this->container->register('asset.css.optimizer', CssOptimizer::class);
+ 
+     new Settings([
+diff --git a/tests/src/Unit/Plugin/FlysystemPluginManagerTest.php b/tests/src/Unit/Plugin/FlysystemPluginManagerTest.php
+index ef9f683..5a75188 100644
+--- a/tests/src/Unit/Plugin/FlysystemPluginManagerTest.php
++++ b/tests/src/Unit/Plugin/FlysystemPluginManagerTest.php
+@@ -2,6 +2,7 @@
+ 
+ namespace Drupal\Tests\flysystem\Unit\Plugin;
+ 
++use Drupal\Component\Datetime\TimeInterface;
+ use Drupal\Core\Cache\MemoryBackend;
+ use Drupal\Core\Extension\ModuleHandlerInterface;
+ use Drupal\flysystem\Plugin\FlysystemPluginManager;
+@@ -18,7 +19,8 @@ class FlysystemPluginManagerTest extends UnitTestCase {
+    */
+   public function test() {
+     $namespaces = new \ArrayObject();
+-    $cache_backend = new MemoryBackend('bin');
++    $time = $this->prophesize(TimeInterface::class);
++    $cache_backend = new MemoryBackend($time->reveal());
+     $module_handle = $this->createMock(ModuleHandlerInterface::class);
+ 
+     $manager = new FlysystemPluginManager($namespaces, $cache_backend, $module_handle);
+@@ -35,7 +37,7 @@ class FlysystemPluginManagerTest extends UnitTestCase {
+       'test3' => ['extensions' => ['missing_extension']],
+     ];
+ 
+-    $method->invokeArgs($manager, [&$definitions]);
++    $method->invokeArgs($manager, [&$definitions]);// @codingStandardsIgnoreLine
+     $this->assertCount(2, $definitions);
+     $this->assertArrayHasKey('test1', $definitions);
+     $this->assertArrayHasKey('test2', $definitions);

@@ -146,8 +146,10 @@
             "drupal/flysystem": {
                 "Automated coding standards fixes": "patches/automated-coding-standards-fixes.patch",
                 "Remaining coding standards fixes": "patches/remaining-coding-standards-fixes.patch",
-                "Coding standards fixes for tests": "patches/coding-standards-patches-tests.patch",
-                "Static Analysis patches": "patches/static-analysis-patches.patch"
+                "Static Analysis patches": "patches/static-analysis-patches.patch",
+                "Patching adapters for interface signatures": "patches/patching-adapters-for-interface-signatures.patch",
+                "Patching FlysystemBridge for interface signatures": "patches/flysystem-bridge-signature-patching.patch",
+                "Patching tests": "patches/patching-tests.patch"
             },
             "drupal/flysystem_s3": {
                 "S3 Coding standards fixes": "patches/flysystem_s3-coding-standards-fixes.patch"
