@@ -144,6 +144,9 @@
                 "Fixing php 8.2 compatibility issues with php-compatibility-sniffer":"patches/php-compatibility-sniffer-8.1-patch.patch"
             },
             "drupal/flysystem": {
+                "Automated coding standards fixes": "patches/automated-coding-standards-fixes.patch",
+                "Remaining coding standards fixes": "patches/remaining-coding-standards-fixes.patch",
+                "Coding standards fixes for tests": "patches/coding-standards-patches-tests.patch"
             },
             "drupal/flysystem_s3": {
                 "S3 Coding standards fixes": "patches/flysystem_s3-coding-standards-fixes.patch"

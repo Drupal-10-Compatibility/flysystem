@@ -1,0 +1,13 @@
+diff --git a/src/Asset/CssOptimizer.php b/src/Asset/CssOptimizer.php
+index 6ff4dec..0cb9857 100644
+--- a/src/Asset/CssOptimizer.php
++++ b/src/Asset/CssOptimizer.php
+@@ -14,7 +14,7 @@ class CssOptimizer extends DrupalCssOptimizer {
+   /**
+    * {@inheritdoc}
+    */
+-  public function rewriteFileURI($matches): string {
++  public function rewriteFileURI($matches): string {// @codingStandardsIgnoreLine
+     // Prefix with base and remove '../' segments where possible.
+     $path = $this->rewriteFileURIBasePath . $matches[1];
+     $last = '';
