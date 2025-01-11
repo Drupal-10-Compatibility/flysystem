@@ -147,6 +147,9 @@
                 "Static Analysis Ignores for deprecations & Drupal static calls": "patches/twistor-static-analsyis-ignores.patch",
                 "Automated coding standards fixes": "patches/twistor-coding-standards-automated-fixes.patch",
                 "And yet more coding standards and static analysis patching":"patches/twistor-and-yet-coding-standards-static-analysis-final.patch"
+            },
+            "drupal/flysystem_s3": {
+                "S3 Coding standards fixes": "patches/flysystem_s3-coding-standards-fixes.patch"
             }
         },
         "drupal-lenient": {

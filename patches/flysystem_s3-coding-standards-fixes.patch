@@ -1,0 +1,42 @@
+diff --git a/flysystem_s3.info.yml b/flysystem_s3.info.yml
+index 501002a..bbc05f3 100644
+--- a/flysystem_s3.info.yml
++++ b/flysystem_s3.info.yml
+@@ -2,7 +2,6 @@ name: Flysystem Amazon S3
+ description: "Provides an Amazon S3 plugin for Flysystem."
+ type: module
+ core_version_requirement: ^9.2 || ^10.0
+-version: 8.0-dev
+ package: Flysystem
+ dependencies:
+   - flysystem:flysystem
+diff --git a/src/Flysystem/S3.php b/src/Flysystem/S3.php
+index 34dc777..745750f 100644
+--- a/src/Flysystem/S3.php
++++ b/src/Flysystem/S3.php
+@@ -26,10 +26,11 @@ use Symfony\Component\DependencyInjection\ContainerInterface;
+  *
+  * @Adapter(id = "s3")
+  */
+-class S3 implements FlysystemPluginInterface, ContainerFactoryPluginInterface {
++class S3 implements FlysystemPluginInterface, ContainerFactoryPluginInterface {// @codingStandardsIgnoreLine
+ 
+   use ImageStyleGenerationTrait;
+-  use FlysystemUrlTrait {getExternalUrl as getDownloadUrl;
++  use FlysystemUrlTrait {
++    getExternalUrl as getDownloadUrl;
+   }
+ 
+   /**
+diff --git a/tests/src/Unit/Flysystem/S3Test.php b/tests/src/Unit/Flysystem/S3Test.php
+index e7801e2..9d71c7e 100644
+--- a/tests/src/Unit/Flysystem/S3Test.php
++++ b/tests/src/Unit/Flysystem/S3Test.php
+@@ -22,7 +22,6 @@ use Symfony\Component\HttpFoundation\Request;
+ use Symfony\Component\HttpFoundation\RequestStack;
+ 
+ // cspell:ignore fsdf sfsdf
+-
+ /**
+  * @coversDefaultClass \Drupal\flysystem_s3\Flysystem\S3
+  * @covers \Drupal\flysystem_s3\Flysystem\S3
