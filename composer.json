@@ -144,12 +144,6 @@
                 "Fixing php 8.2 compatibility issues with php-compatibility-sniffer":"patches/php-compatibility-sniffer-8.1-patch.patch"
             },
             "drupal/flysystem": {
-                "Automated coding standards fixes": "patches/automated-coding-standards-fixes.patch",
-                "Remaining coding standards fixes": "patches/remaining-coding-standards-fixes.patch",
-                "Static Analysis patches": "patches/static-analysis-patches.patch",
-                "Patching adapters for interface signatures": "patches/patching-adapters-for-interface-signatures.patch",
-                "Patching FlysystemBridge for interface signatures": "patches/flysystem-bridge-signature-patching.patch",
-                "Patching tests": "patches/patching-tests.patch"
             },
             "drupal/flysystem_s3": {
                 "S3 Coding standards fixes": "patches/flysystem_s3-coding-standards-fixes.patch"
