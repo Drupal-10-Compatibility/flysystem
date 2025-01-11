@@ -37,6 +37,7 @@
         "drupal/core-recommended": "^10.3",
         "drupal/flysystem": "2.2.x-dev",
         "drupal/flysystem_s3": "2.1.x-dev",
+        "drupal/s3fs": "*",
         "drush/drush": "^13.3",
         "league/flysystem": "^1.0.3",
         "league/flysystem-replicate-adapter": "~1.0",
@@ -144,6 +145,7 @@
                 "Fixing php 8.2 compatibility issues with php-compatibility-sniffer":"patches/php-compatibility-sniffer-8.1-patch.patch"
             },
             "drupal/flysystem": {
+                "Fix Asset CollectionOptimizers and tests": "patches/fix-collection-optimizers-and-tests.patch"
             },
             "drupal/flysystem_s3": {
                 "S3 Coding standards fixes": "patches/flysystem_s3-coding-standards-fixes.patch"
