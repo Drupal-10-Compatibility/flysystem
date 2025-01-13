@@ -104,36 +104,30 @@ index 9fb2b30..4a58c41 100644
          // Don't break, the last configured one will win.
          $extension_scheme = $scheme;
 diff --git a/src/FlysystemServiceProvider.php b/src/FlysystemServiceProvider.php
-index 1c2590d..1c078c0 100644
+index 1c2590d..d245320 100644
 --- a/src/FlysystemServiceProvider.php
 +++ b/src/FlysystemServiceProvider.php
-@@ -60,27 +60,21 @@ class FlysystemServiceProvider implements ServiceProviderInterface {
+@@ -65,22 +65,20 @@ class FlysystemServiceProvider implements ServiceProviderInterface {
        return;
      }
  
--    // Don't rewrite if there's nothing to change.
--    if ($this->getSchemeForExtension($extension) === 'public') {
--      return;
-+    if ($extension === 'css') {
-+      $optimizer = $container->getDefinition('asset.' . $extension . '.collection_optimizer');
-+      if ($optimizer->getClass() === 'Drupal\Core\Asset\\' . ucfirst($extension) . 'CollectionOptimizer') {
-+        @trigger_error(sprintf('The serve_%s Flysystem option is deprecated in flysystem:2.1.0 and is removed from flysystem:2.3.0. Use the assets:// stream wrapper instead. See https://www.drupal.org/node/3328126', $extension), E_USER_DEPRECATED);
-+        $optimizer->setClass('Drupal\flysystem\Asset\\' . ucfirst($extension) . 'CollectionOptimizer');
-+      }
-     }
+-    $container
+-      ->getDefinition('asset.' . $extension . '.dumper')
+-      ->setClass('Drupal\flysystem\Asset\AssetDumper');
 -
-     $container
-       ->getDefinition('asset.' . $extension . '.dumper')
-       ->setClass('Drupal\flysystem\Asset\AssetDumper');
- 
--    $optimizer = $container->getDefinition('asset.' . $extension . '.collection_optimizer');
--    if ($optimizer->getClass() === 'Drupal\Core\Asset\\' . ucfirst($extension) . 'CollectionOptimizer') {
--      $optimizer->setClass('Drupal\flysystem\Asset\\' . ucfirst($extension) . 'CollectionOptimizer');
--    }
+     $optimizer = $container->getDefinition('asset.' . $extension . '.collection_optimizer');
+     if ($optimizer->getClass() === 'Drupal\Core\Asset\\' . ucfirst($extension) . 'CollectionOptimizer') {
++      @trigger_error(sprintf('The serve_%s Flysystem option is deprecated in flysystem:2.1.0 and is removed from flysystem:2.3.0. Use the assets:// stream wrapper instead. See https://www.drupal.org/node/3328126', $extension), E_USER_DEPRECATED);
+       $optimizer->setClass('Drupal\flysystem\Asset\\' . ucfirst($extension) . 'CollectionOptimizer');
+     }
 -    if ($optimizer->getClass() === 'Drupal\Core\Asset\\' . ucfirst($extension) . 'CollectionOptimizerLazy') {
 -      $optimizer->setClass('Drupal\flysystem\Asset\\' . ucfirst($extension) . 'CollectionOptimizerLazy');
 -    }
--
++
++    $container
++      ->getDefinition('asset.' . $extension . '.dumper')
++      ->setClass('Drupal\flysystem\Asset\AssetDumper');
+ 
      if ($extension === 'css') {
        $container
 -        ->getDefinition('asset.css.optimizer')
