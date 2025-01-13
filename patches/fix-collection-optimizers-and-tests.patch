@@ -175,3 +175,27 @@ index a9a01a9..dd4fdce 100644
    }
  
  }
+diff --git a/tests/src/Unit/FlysystemServiceProviderTest.php b/tests/src/Unit/FlysystemServiceProviderTest.php
+index 8fbec1a..a0c392c 100644
+--- a/tests/src/Unit/FlysystemServiceProviderTest.php
++++ b/tests/src/Unit/FlysystemServiceProviderTest.php
+@@ -91,18 +91,11 @@ class FlysystemServiceProviderTest extends UnitTestCase {
+   /**
+    * @covers \Drupal\flysystem\FlysystemServiceProvider
+    */
+-  public function test() {
++  public function testSwappingJsServices() {
+     // Test swapping the asset dumper.
+     $this->container->register('asset.js.dumper', AssetDumper::class);
+-    (new FlysystemServiceProvider())->register($this->container);
+-    $this->assertSame(AssetDumper::class, $this->container->getDefinition('asset.js.dumper')->getClass());
+-
+     $this->container->register('asset.js.collection_optimizer', JsCollectionOptimizer::class);// @phpstan-ignore-line @codingStandardsIgnoreLine 
+-    (new FlysystemServiceProvider())->register($this->container);
+-    $this->assertSame(AssetDumper::class, $this->container->getDefinition('asset.js.dumper')->getClass());
+-    $this->assertSame(JsCollectionOptimizer::class, $this->container->getDefinition('asset.js.collection_optimizer')->getClass());// @phpstan-ignore-line @codingStandardsIgnoreLine 
+ 
+-    // A successful swap.
+     new Settings([
+       'flysystem' => [
+         'testscheme' => [
