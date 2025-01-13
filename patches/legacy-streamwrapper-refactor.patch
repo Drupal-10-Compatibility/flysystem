@@ -13,15 +13,240 @@ index a0e64a1..1f84d61 100644
   * An adapter for Flysystem to StreamWrapperInterface.
 diff --git a/src/StreamWrapper/FlysystemStreamWrapper.php b/src/StreamWrapper/FlysystemStreamWrapper.php
 new file mode 100644
-index 0000000..4088df5
+index 0000000..b3e5b8c
 --- /dev/null
 +++ b/src/StreamWrapper/FlysystemStreamWrapper.php
-@@ -0,0 +1,7 @@
+@@ -0,0 +1,182 @@
 +<?php
 +
 +namespace Drupal\flysystem\StreamWrapper;
 +
++use League\Flysystem\AdapterInterface;
++use League\Flysystem\FileNotFoundException;
++use League\Flysystem\FilesystemInterface;
++use League\Flysystem\Util;
 +use Twistor\FlysystemStreamWrapper as LegacyStreamWrapper;
++use Twistor\Flysystem\Exception\DirectoryExistsException;
++use Twistor\Flysystem\Exception\DirectoryNotEmptyException;
++use Twistor\Flysystem\Exception\NotADirectoryException;
++use Twistor\Flysystem\Exception\TriggerErrorException;
++use Twistor\Flysystem\Plugin\ForcedRename;
++use Twistor\Flysystem\Plugin\Mkdir;
++use Twistor\Flysystem\Plugin\Rmdir;
++use Twistor\Flysystem\Plugin\Stat;
++use Twistor\Flysystem\Plugin\Touch;
 +
-+class FlysystemStreamWrapper extends LegacyStreamwRapper {}
++class FlysystemStreamWrapper extends LegacyStreamwRapper {
++
++  /**
++   * The filesystem of the current stream wrapper.
++   *
++   * @var \League\Flysystem\FilesystemInterface
++   */
++  protected $filesystem;
++
++  /**
++   * Renames a file or directory.
++   *
++   * @param string $uri_from
++   *   URI to rename.
++   * @param string $uri_to
++   *   New name for URI.
++   *
++   * @return bool
++   *  TRUE on success, FALSE on failure.
++   * 
++   * @throws \League\Flysystem\FileNotFoundException
++   * @throws \Twistor\Flysystem\Exception\DirectoryExistsException
++   * @throws \Twistor\Flysystem\Exception\DirectoryNotEmptyException
++   * @throws \Twistor\Flysystem\Exception\NotADirectoryException
++   */
++  public function rename($uri_from, $uri_to) {
++    $this->uri = $uri_from;
++    $path = Util::normalizePath($uri_from);
++    $newpath = Util::normalizePath($uri_to);
++
++    // Ignore useless renames.
++    if ($path === $newpath) {
++        return true;
++    }
++    $path = Util::normalizePath($path);
++    $newpath = Util::normalizePath($newpath);
++
++    // Ignore useless renames.
++    if ($path === $newpath) {
++        return true;
++    }
++
++    if ( ! $this->isValidRename($path, $newpath)) {
++        // Returns false if a Flysystem call fails.
++        return false;
++    }
++
++    return (bool) $this->filesystem->getAdapter()->rename($path, $newpath);
++  }
++
++  /**
++   * Sets the Flysystem filesystem.
++   *
++   * @param \League\Flysystem\FilesystemInterface $filesystem
++   *  The Flysystem filesystem object.
++   */
++  public function setFilesystem($filesystem) {
++    $this->filesystem = $filesystem;
++  }
++
++  /**
++   * Returns the Flysystem filesystem.
++   *
++   * @return \League\Flysystem\FilesystemInterface
++   *   The filesystem object.
++   */
++  public function getFilesystem() {
++    if (isset($this->filesystem)) {
++      return $this->filesystem;
++    }
++
++    $this->filesystem = static::$filesystems[$this->getProtocol()];
++
++    return $this->filesystem;
++  }
++
++  /**
++   * Returns the protocol (scheme) from the internal URI.
++   *
++   * @return string
++   *   The protocol.
++   */
++  protected function getProtocol() {
++    return substr($this->uri, 0, strpos($this->uri, '://'));
++  }
++
++  /**
++   * Checks that a rename is valid.
++   *
++   * @param string $source
++   * @param string $dest
++   *
++   * @return bool
++   *
++   * @throws \League\Flysystem\FileNotFoundException
++   * @throws \Twistor\Flysystem\Exception\DirectoryExistsException
++   * @throws \Twistor\Flysystem\Exception\DirectoryNotEmptyException
++   * @throws \Twistor\Flysystem\Exception\NotADirectoryException
++   */
++  protected function isValidRename($source, $dest) {
++    $adapter = $this->filesystem->getAdapter();
++
++    if ( ! $adapter->has($source)) {
++        throw new FileNotFoundException($source);
++    }
++
++    $subdir = Util::dirname($dest);
++
++    if (strlen($subdir) && ! $adapter->has($subdir)) {
++        throw new FileNotFoundException($source);
++    }
++
++    if ( ! $adapter->has($dest)) {
++        return true;
++    }
++
++    return $this->compareTypes($source, $dest);
++  }
++
++  /**
++   * Compares the file/dir for the source and dest.
++   *
++   * @param string $source
++   * @param string $dest
++   *
++   * @return bool
++   *
++   * @throws \Twistor\Flysystem\Exception\DirectoryExistsException
++   * @throws \Twistor\Flysystem\Exception\DirectoryNotEmptyException
++   * @throws \Twistor\Flysystem\Exception\NotADirectoryException
++   */
++  protected function compareTypes($source, $dest) {
++    $adapter = $this->filesystem->getAdapter();
++
++    $source_type = $adapter->getMetadata($source)['type'];
++    $dest_type = $adapter->getMetadata($dest)['type'];
++
++    // These three checks are done in order of cost to minimize Flysystem
++    // calls.
++
++    // Don't allow overwriting different types.
++    if ($source_type !== $dest_type) {
++        if ($dest_type === 'dir') {
++            throw new DirectoryExistsException();
++        }
++
++        throw new NotADirectoryException();
++    }
++
++    // Allow overwriting destination file.
++    if ($source_type === 'file') {
++        return $adapter->delete($dest);
++    }
++
++    // Allow overwriting destination directory if not empty.
++    $contents = $this->filesystem->listContents($dest);
++    if ( ! empty($contents)) {
++        throw new DirectoryNotEmptyException();
++    }
++
++    return $adapter->deleteDir($dest);
++  }
++}
+\ No newline at end of file
+diff --git a/tests/src/Unit/StreamWrapper/FlysystemStreamWrapperTest.php b/tests/src/Unit/StreamWrapper/FlysystemStreamWrapperTest.php
+new file mode 100644
+index 0000000..12b5939
+--- /dev/null
++++ b/tests/src/Unit/StreamWrapper/FlysystemStreamWrapperTest.php
+@@ -0,0 +1,43 @@
++<?php
++
++namespace Drupal\Tests\flysystem\Unit\StreamWrapper;
++
++use Drupal\Core\DependencyInjection\ContainerBuilder;
++use Drupal\Core\Extension\ModuleHandlerInterface;
++use Drupal\Core\Site\Settings;
++use Drupal\Core\StreamWrapper\StreamWrapperManagerInterface;
++use Drupal\flysystem\StreamWrapper\FlysystemStreamWrapper;
++use Drupal\flysystem\FlysystemBridge;
++use Drupal\flysystem\FlysystemFactory;
++use Drupal\Tests\UnitTestCase;
++use League\Flysystem\AdapterInterface;
++use League\Flysystem\Filesystem;
++/**
++ * @coversDefaultClass \Drupal\flysystem\StreamWrapper\FlysystemStreamWrapper
++ * @group flysystem
++ */
++class FlysystemStreamWrapperTest extends UnitTestCase {
++
++  /**
++   * {@inheritdoc}
++   */
++  public function setUp(): void {
++    parent::setUp();
++  }
++
++  /**
++   * @covers ::rename
++   */
++  public function testRename(): void {
++    $adapter = $this->prophesize(AdapterInterface::class);
++    $adapter->has('source')->willReturn(true);
++    $adapter->has('dest')->willReturn(true);
++    $adapter->getMetadata('source')->willReturn(['type' => 'file']);
++    $adapter->getMetadata('dest')->willReturn(['type' => 'file']);
++    $adapter->delete('dest')->willReturn(false);
++    $filesystem = new Filesystem($adapter->reveal());
++    $streamWrapper = new FlysystemStreamWrapper();
++    $streamWrapper->setFilesystem($filesystem);
++    $this->assertFalse($streamWrapper->getFilesystem()->getAdapter()->rename($path, $newpath));
++  }
++}
 \ No newline at end of file
