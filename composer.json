@@ -144,9 +144,6 @@
             "phpcompatibility/php-compatibility": {
                 "Fixing php 8.2 compatibility issues with php-compatibility-sniffer":"patches/php-compatibility-sniffer-8.1-patch.patch"
             },
-            "drupal/flysystem": {
-                "Fix Asset CollectionOptimizers and tests": "patches/fix-collection-optimizers-and-tests.patch"
-            },
             "drupal/flysystem_s3": {
                 "S3 Coding standards fixes": "patches/flysystem_s3-coding-standards-fixes.patch"
             }
