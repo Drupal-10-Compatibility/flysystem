@@ -1,0 +1,27 @@
+diff --git a/src/FlysystemBridge.php b/src/FlysystemBridge.php
+index a0e64a1..1f84d61 100644
+--- a/src/FlysystemBridge.php
++++ b/src/FlysystemBridge.php
+@@ -6,7 +6,7 @@ use Drupal\Core\StreamWrapper\StreamWrapperInterface;
+ use Drupal\Core\StringTranslation\StringTranslationTrait;
+ use League\Flysystem\FilesystemInterface;
+ use League\Flysystem\Util;
+-use Twistor\FlysystemStreamWrapper;
++use Drupal\flysystem\StreamWrapper\FlysystemStreamWrapper;
+ 
+ /**
+  * An adapter for Flysystem to StreamWrapperInterface.
+diff --git a/src/StreamWrapper/FlysystemStreamWrapper.php b/src/StreamWrapper/FlysystemStreamWrapper.php
+new file mode 100644
+index 0000000..4088df5
+--- /dev/null
++++ b/src/StreamWrapper/FlysystemStreamWrapper.php
+@@ -0,0 +1,7 @@
++<?php
++
++namespace Drupal\flysystem\StreamWrapper;
++
++use Twistor\FlysystemStreamWrapper as LegacyStreamWrapper;
++
++class FlysystemStreamWrapper extends LegacyStreamwRapper {}
+\ No newline at end of file

@@ -144,6 +144,9 @@
             "phpcompatibility/php-compatibility": {
                 "Fixing php 8.2 compatibility issues with php-compatibility-sniffer":"patches/php-compatibility-sniffer-8.1-patch.patch"
             },
+            "drupal/flysystem": {
+                "legacy streamwrapper refactor": "patches/legacy-streamwrapper-refactor.patch"
+            },
             "drupal/flysystem_s3": {
                 "S3 Coding standards fixes": "patches/flysystem_s3-coding-standards-fixes.patch"
             }
