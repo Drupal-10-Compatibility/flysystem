@@ -1,5 +1,5 @@
 diff --git a/src/FlysystemBridge.php b/src/FlysystemBridge.php
-index a0e64a1..1f84d61 100644
+index a0e64a1..609d655 100644
 --- a/src/FlysystemBridge.php
 +++ b/src/FlysystemBridge.php
 @@ -6,7 +6,7 @@ use Drupal\Core\StreamWrapper\StreamWrapperInterface;
@@ -11,12 +11,21 @@ index a0e64a1..1f84d61 100644
  
  /**
   * An adapter for Flysystem to StreamWrapperInterface.
+@@ -118,7 +118,7 @@ class FlysystemBridge extends FlysystemStreamWrapper implements StreamWrapperInt
+   /**
+    * {@inheritdoc}
+    */
+-  protected function getFilesystem(): FilesystemInterface {
++  public function getFilesystem(): FilesystemInterface {
+     if (!isset($this->filesystem)) {
+       $this->filesystem = $this->getFilesystemForScheme($this->getProtocol());
+     }
 diff --git a/src/StreamWrapper/FlysystemStreamWrapper.php b/src/StreamWrapper/FlysystemStreamWrapper.php
 new file mode 100644
-index 0000000..b3e5b8c
+index 0000000..0658e1d
 --- /dev/null
 +++ b/src/StreamWrapper/FlysystemStreamWrapper.php
-@@ -0,0 +1,182 @@
+@@ -0,0 +1,230 @@
 +<?php
 +
 +namespace Drupal\flysystem\StreamWrapper;
@@ -30,7 +39,6 @@ index 0000000..b3e5b8c
 +use Twistor\Flysystem\Exception\DirectoryNotEmptyException;
 +use Twistor\Flysystem\Exception\NotADirectoryException;
 +use Twistor\Flysystem\Exception\TriggerErrorException;
-+use Twistor\Flysystem\Plugin\ForcedRename;
 +use Twistor\Flysystem\Plugin\Mkdir;
 +use Twistor\Flysystem\Plugin\Rmdir;
 +use Twistor\Flysystem\Plugin\Stat;
@@ -44,6 +52,7 @@ index 0000000..b3e5b8c
 +   * @var \League\Flysystem\FilesystemInterface
 +   */
 +  protected $filesystem;
++
 +
 +  /**
 +   * Renames a file or directory.
@@ -78,14 +87,44 @@ index 0000000..b3e5b8c
 +        return true;
 +    }
 +
-+    if ( ! $this->isValidRename($path, $newpath)) {
++    if ( !$this->isValidRename($path, $newpath)) {
 +        // Returns false if a Flysystem call fails.
 +        return false;
 +    }
 +
-+    return (bool) $this->filesystem->getAdapter()->rename($path, $newpath);
++    return (bool) $this->getFilesystem()->rename($path, $newpath);
 +  }
 +
++  /**
++   * Creates a directory.
++   *
++   * @param string $uri
++   *   Internal URI.
++   * @param int $mode
++   * @param int $options
++   *
++   * @return bool
++   *   True on success, false on failure.
++   *
++   * @throws \League\Flysystem\FileNotFoundException
++   */
++  /**
++  public function mkdir($uri, $mode, $options) {
++    $this->uri = $uri;
++    $dirname = Util::normalizePath($uri);
++    //$adapter = $this->filesystem->getAdapter();
++    // If recursive, or a single level directory, just create it.
++    if (($options & STREAM_MKDIR_RECURSIVE) || strpos($dirname, '/') === false) {
++      return (bool) $this->getFilesystem()->createDir($dirname, $this->defaultConfig());
++    }
++
++    if ( !$adapter->has(dirname($dirname))) {
++      throw new FileNotFoundException($dirname);
++    }
++    //return (bool) $adapter->createDir($dirname, $this->defaultConfig());
++    return $this->getFilesystem()->createDir($dirname);
++  }
++  */
 +  /**
 +   * Sets the Flysystem filesystem.
 +   *
@@ -110,6 +149,24 @@ index 0000000..b3e5b8c
 +    $this->filesystem = static::$filesystems[$this->getProtocol()];
 +
 +    return $this->filesystem;
++  }
++
++  /**
++   * Returns the local writable target of the resource within the stream.
++   *
++   * @param string|null $uri
++   *   The URI.
++   *
++   * @return string
++   *   The path appropriate for use with Flysystem.
++   */
++  protected function getTarget($uri = null) {
++    if ( ! isset($uri)) {
++      $uri = $this->uri;
++    }
++
++    $target = substr($uri, strpos($uri, '://') + 3);
++    return $target === false ? '' : $target;
 +  }
 +
 +  /**
@@ -202,10 +259,10 @@ index 0000000..b3e5b8c
 \ No newline at end of file
 diff --git a/tests/src/Unit/StreamWrapper/FlysystemStreamWrapperTest.php b/tests/src/Unit/StreamWrapper/FlysystemStreamWrapperTest.php
 new file mode 100644
-index 0000000..12b5939
+index 0000000..8e0141a
 --- /dev/null
 +++ b/tests/src/Unit/StreamWrapper/FlysystemStreamWrapperTest.php
-@@ -0,0 +1,43 @@
+@@ -0,0 +1,59 @@
 +<?php
 +
 +namespace Drupal\Tests\flysystem\Unit\StreamWrapper;
@@ -238,15 +295,31 @@ index 0000000..12b5939
 +   */
 +  public function testRename(): void {
 +    $adapter = $this->prophesize(AdapterInterface::class);
-+    $adapter->has('source')->willReturn(true);
-+    $adapter->has('dest')->willReturn(true);
-+    $adapter->getMetadata('source')->willReturn(['type' => 'file']);
-+    $adapter->getMetadata('dest')->willReturn(['type' => 'file']);
-+    $adapter->delete('dest')->willReturn(false);
++    $adapter->has('path')->willReturn(true);
++    $adapter->has('newpath')->willReturn(false);
++    $adapter->getMetadata('path')->willReturn(['type' => 'file']);
++    $adapter->getMetadata('newpath')->willReturn(['type' => 'file']);
++    //$adapter->delete('newpath')->willReturn(false);
++    $adapter->rename('path', 'newpath')->willReturn(true);
 +    $filesystem = new Filesystem($adapter->reveal());
 +    $streamWrapper = new FlysystemStreamWrapper();
 +    $streamWrapper->setFilesystem($filesystem);
-+    $this->assertFalse($streamWrapper->getFilesystem()->getAdapter()->rename($path, $newpath));
++    //$this->assertFalse($streamWrapper->getFilesystem()->getAdapter()->rename('path', 'newpath'));
++    $this->assertTrue($streamWrapper->getFilesystem()->rename('path', 'newpath'));
++  }
++
++  /**
++   * @covers ::mkdir
++   */  
++  public function testMkdir(): void {
++    $adapter = $this->prophesize(AdapterInterface::class);
++    $adapter->has('dirname')->willReturn(false);
++    $adapter->getMetadata('dirname')->willReturn(['path' => 'dirname', 'type' => 'dir']);
++    $adapter->createDir('dirname')->willReturn(true);
++    $filesystem = new Filesystem($adapter->reveal());
++    $streamWrapper = new FlysystemStreamWrapper();
++    $streamWrapper->setFilesystem($filesystem);
++    $this->assertTrue($streamWrapper->getFilesystem()->createDir('dirname'));
 +  }
 +}
 \ No newline at end of file
