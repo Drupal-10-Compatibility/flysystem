@@ -3,4 +3,13 @@
 ## Usage: unit-tests
 ## Example: "ddev unit-tests"
 
-/var/www/html/vendor/bin/phpunit -c /var/www/html/$DDEV_DOCROOT/core/phpunit.xml.dist --group=$PROJECT_NAME /var/www/html/$DDEV_DOCROOT/modules/contrib/$PROJECT_NAME
+readarray -t projects < <(awk -F',' '{ for( i=1; i<=NF; i++ ) print $i }' <<<"$PROJECT_NAMES")
+delete=media
+projects=( "${projects[@]/$delete}" )
+delete=media_library
+projects=( "${projects[@]/$delete}" )
+## Enable the projects stored in the $PROJECT_NAMES environment variable.
+for i in "${projects[@]}"
+do
+  /var/www/html/vendor/bin/phpunit -c /var/www/html/$DDEV_DOCROOT/modules/contrib/$i/phpunit.xml.dist --group=$i /var/www/html/$DDEV_DOCROOT/modules/contrib/$i
+done
