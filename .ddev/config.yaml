@@ -16,9 +16,14 @@ use_dns_when_possible: true
 composer_version: "2"
 web_environment:
   - PROJECT_NAMES=flysystem
-  - SIMPLETEST_DB=mysql://db:db@db:3306/db
+  - SIMPLETEST_DB=mysql://db:db@db:3306/testing_db
+  - PROJECT_NAMES=flysystem
+  - CORE_MODULES=media,media_library
   - SIMPLETEST_BASE_URL=https://web:443 
-
+hooks:
+  post-start:
+  - exec: mysql -uroot -proot -hdb -e "CREATE DATABASE IF NOT EXISTS testing_db; GRANT ALL ON testing_db.* TO 'db'@'%'"
+    service: db
 # Key features of ddev's config.yaml:
 
 # name: <projectname> # Name of the project, automatically provides

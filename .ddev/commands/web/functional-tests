@@ -1,0 +1,15 @@
+#!/bin/bash
+## Description: Execute any unit tests for the project (run `ddev install` first)
+## Usage: functional-tests
+## Example: "ddev functional-tests"
+
+readarray -t projects < <(awk -F',' '{ for( i=1; i<=NF; i++ ) print $i }' <<<"$PROJECT_NAMES")
+delete=media
+projects=( "${projects[@]/$delete}" )
+delete=media_library
+projects=( "${projects[@]/$delete}" )
+## Enable the projects stored in the $PROJECT_NAMES environment variable.
+for i in "${projects[@]}"
+do
+  /var/www/html/vendor/bin/phpunit -c /var/www/html/$DDEV_DOCROOT/core/phpunit.xml.dist --testsuite functional --group=$i /var/www/html/$DDEV_DOCROOT/modules/contrib/$i
+done

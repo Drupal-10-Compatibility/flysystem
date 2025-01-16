@@ -12,13 +12,16 @@ echo "Composer packages are installed"
 
 echo "Running site installation."
 ## Install the drupal site using the standard profile.
-drush -y si standard || exit 1;
+drush -y si testing || exit 1;
 
 ## Enable the projects stored in the $PROJECT_NAMES environment variable.
 for i in "${projects[@]}"
 do
   drush -y en $i || exit 1;
 done
+
+#drush config-set -y "system.site" uuid 3474fb30-8241-4076-9dcd-edce3d157115
+#drush config:import -y
 
 echo "Site installation is finished"
 
