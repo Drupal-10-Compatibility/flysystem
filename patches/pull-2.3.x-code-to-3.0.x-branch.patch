@@ -1,0 +1,3323 @@
+diff --git a/README.md b/README.md
+index 4c5b1f2..4fa0769 100644
+--- a/README.md
++++ b/README.md
+@@ -64,7 +64,7 @@ $schemes = [
+       'cache' => TRUE, 
+       ...
+       // This will be treated similarly to Drupal's private file system
+-      'root' => '/path/to/dir/outsite/drupal',
++      'root' => '/path/to/dir/outside/drupal',
+       // Or,
+       // In order fo the public setting to work, the path must be relative
+       // to the root of the Drupal install.
+@@ -81,17 +81,6 @@ $schemes = [
+       // Note: Use as a replication endpoint does not prevent that endpoint from
+       //   also being used for other purposes. 
+       'replicate' => 'ftpexample',
+-      // Serve Javascript or CSS via this stream wrapper. This is useful for
+-      // adapters that function as CDNs like the S3 adapter.
+-      //
+-      // Note:  if you have configured multiple flysystem schemes, you can only
+-      // configure one scheme to manage CSS and JS files.  If you do happen to
+-      // configure multiple schemes, the last scheme defined with the following
+-      // parameters will be the one actually used for storing and serving CSS and
+-      // JS.  @see https://www.drupal.org/project/flysystem/issues/3056455
+-      'serve_js' => TRUE, // Serve Javascript or CSS via this stream wrapper.
+-      'serve_css' => TRUE, // This is useful for adapters that function as
+-      // CDNs like the S3 adapter.
+     ],
+   // Used as a replication endpoint for 'local-example' (see the 'replicate'
+   // option) but may still be used as a standalone endpoint.
+@@ -118,6 +107,9 @@ $schemes = [
+ // Don't forget this!
+ $settings['flysystem'] = $schemes;
+ ```
++## BREAKING CHANGES ##
++With 2.3.0-alpha1, we introduced backwards compatibility breaking changes.  The settings.php scheme configuration no longer includes code to store css / js on a Flysystem scheme.  Drupal 10.1 introduced the `assets://` scheme for css and js.  To utilize Flysystem for storing CSS and JS, you
++simply override Drupal Core's implementation of `assets://` to map it to a Flysystem storage mechanism just as you would for any other file asset.
+ 
+ ## USAGE ##
+ After configuring the endpoints, the default storage location may be changed on
+@@ -141,6 +133,6 @@ This code in Drupal Core:
+ 
+ - https://git.drupalcode.org/project/drupal/-/blob/fd92a54070af95150b3e2277b97b047b4df7f995/core/modules/image/src/Entity/ImageStyle.php#L284-295
+ 
+-assumes that all read/write filewrappers will have image styles stored stored at the uri `wrapper://styles/{$imagestyle->id()}``. This is not always the case, particularly when modules create custom filewrappers such as this one. While this works most of the time, this could be a wrong assumption when the site needs to mount something like a FTP filesystem that just so happens to have a folder named "styles" and a subfolder with the image style id that contains things like CSS files or the like. This could result in irreparable file deletion.
++assumes that all read/write file wrappers will have image styles stored at the uri `wrapper://styles/{$style->id()}``. This is not always the case, particularly when modules create custom file wrappers such as this one. While this works most of the time, this could be a wrong assumption when the site needs to mount something like a FTP filesystem that just so happens to have a folder named "styles" and a subfolder with the image style id that contains things like CSS files or the like. This could result in irreparable file deletion.
+ 
+ More information can be found documented at https://www.drupal.org/project/drupal/issues/3284521
+diff --git a/flysystem.info.yml b/flysystem.info.yml
+index 75c8ba4..61ace0e 100644
+--- a/flysystem.info.yml
++++ b/flysystem.info.yml
+@@ -1,7 +1,5 @@
+ name: Flysystem
+-type: module
+ description: 'Provides access to various filesystem backends using Flysystem.'
+ package: Flysystem
+-core_version_requirement: ^10.3
+-dependencies:
+-  - drupal:field
++type: module
++core_version_requirement: ^10.3 || ^11
+diff --git a/flysystem.install b/flysystem.install
+new file mode 100644
+index 0000000..93b8b05
+--- /dev/null
++++ b/flysystem.install
+@@ -0,0 +1,91 @@
++<?php
++
++/**
++ * @file
++ * Install, update and uninstall functions for the flysystem module.
++ */
++
++use Drupal\Core\Site\Settings;
++use Drupal\flysystem\Logger\Convert;
++
++/**
++ * Implements hook_requirements().
++ */
++function flysystem_requirements($phase) {
++  $requirements = [];
++
++  __flysystem_validate_schemes($requirements);
++  __flysystem_check_dependencies($requirements);
++
++  if ($phase === 'runtime') {
++    __flysystem_call_ensure($requirements);
++  }
++
++  return $requirements;
++}
++
++/**
++ * Implements hook_install().
++ */
++function flysystem_install() {
++  Drupal::service('flysystem_factory')->ensure();
++}
++
++/**
++ * Validates configured schemes.
++ */
++function __flysystem_validate_schemes(array &$requirements) {
++  $invalid = [];
++  foreach (array_keys(Settings::get('flysystem', [])) as $scheme) {
++    if (!preg_match('/^[a-zA-Z0-9+.-]+$/', $scheme)) {
++      $invalid[] = $scheme;
++    }
++  }
++
++  if ($invalid) {
++    $requirements['flysystem_invalid_scheme'] = [
++      'title' => \Drupal::translation()->translate('Invalid Flysystem schemes in settings.php'),
++      'description' => \Drupal::translation()->translate("The following schemes are not in the correct format: %schemes. Scheme names can only contain letters, numbers, + (plus sign), . (period), - (hyphen).", ['%schemes' => implode(', ', $invalid)]),
++      'severity' => REQUIREMENT_ERROR,
++    ];
++  }
++}
++
++/**
++ * Checks that dependencies are installed.
++ */
++function __flysystem_check_dependencies(array &$requirements) {
++  $dependencies = [
++    'League\Flysystem\Filesystem' => \Drupal::translation()->translate('Flysystem'),
++    'M2MTech\FlysystemStreamWrapper\FlysystemStreamWrapper' => \Drupal::translation()->translate('stream wrapper'),
++  ];
++
++  $missing = array_filter(array_map(function ($dependency) use ($dependencies) {
++    return class_exists($dependency) ? FALSE : $dependencies[$dependency];
++  }, array_keys($dependencies)));
++
++  // @codeCoverageIgnoreStart
++  if ($missing) {
++    $requirements['flysystem_dependencies'] = [
++      'title' => \Drupal::translation()->translate('Flysystem'),
++      'description' => \Drupal::translation()->translate('Dependencies missing: @deps.', ['@deps' => implode(', ', $missing)]),
++      'severity' => REQUIREMENT_ERROR,
++    ];
++  }
++  // @codeCoverageIgnoreEnd
++}
++
++/**
++ * Checks the state of existing configuration.
++ */
++function __flysystem_call_ensure(array &$requirements) {
++  foreach (\Drupal::service('flysystem_factory')->ensure() as $scheme => $errors) {
++    foreach ($errors as $error) {
++      $requirements['flysystem:' . $scheme] = [
++        'title' => \Drupal::translation()->translate('Flysystem: @scheme', ['@scheme' => $scheme]),
++        'description' => \Drupal::translation()->translate($error['message'], $error['context']),
++        'severity' => Convert::rfcToHookRequirements($error['severity']),
++      ];
++    }
++  }
++}
+diff --git a/flysystem.links.action.yml b/flysystem.links.action.yml
+index 0b396c0..3075a61 100644
+--- a/flysystem.links.action.yml
++++ b/flysystem.links.action.yml
+@@ -1,3 +1,8 @@
++flysystem.sync:
++  route_name: node.add_page
++  title: 'Add content'
++  appears_on:
++    - system.admin_content
+ entity.flysystem_adapter_config.add_form:
+   route_name: 'entity.flysystem_adapter_config.add_form'
+   title: 'Configure a Flysystem Adapter'
+diff --git a/flysystem.links.menu.yml b/flysystem.links.menu.yml
+index 8491e60..42e66bc 100644
+--- a/flysystem.links.menu.yml
++++ b/flysystem.links.menu.yml
+@@ -1,3 +1,8 @@
++flysystem.config:
++  title: 'Flysystem'
++  description: 'Configure settings related to Flysystem.'
++  parent: system.file_system_settings
++  route_name: flysystem.config
+ entity.flysystem_adapter_config.overview:
+   title: Configured Flysystem Adapters
+   parent: system.admin_config_media
+diff --git a/flysystem.links.task.yml b/flysystem.links.task.yml
+index a9386c2..9fd6508 100644
+--- a/flysystem.links.task.yml
++++ b/flysystem.links.task.yml
+@@ -1,9 +1,19 @@
+ system.file_system_settings:
++  title: Settings
+   route_name: system.file_system_settings
+   base_route: system.file_system_settings
+-  title: Settings
+ 
+ flysystem.config:
++  title: Flysystem
+   route_name: flysystem.config
+   base_route: system.file_system_settings
+-  title: Flysystem
++
++flysystem.sync:
++  title: 'Sync filesystems'
++  route_name: flysystem.config
++  parent_id: flysystem.config
++
++flysystem.migrate_field:
++  title: 'Field migration'
++  route_name: flysystem.migrate_field
++  parent_id: flysystem.config
+diff --git a/flysystem.module b/flysystem.module
+index da02359..e9fb943 100644
+--- a/flysystem.module
++++ b/flysystem.module
+@@ -8,21 +8,29 @@
+ use Drupal\Core\Access\AccessResult;
+ use Drupal\Core\Entity\EntityInterface;
+ use Drupal\Core\Session\AccountInterface;
++use Drupal\Core\Site\Settings;
+ use Drupal\Core\StreamWrapper\StreamWrapperManager;
+ use Drupal\file\FileInterface;
+ 
++/**
++ * Implements hook_cron().
++ */
++function flysystem_cron() {
++  Drupal::service('flysystem_factory')->ensure();
++}
++
++/**
++ * Implements hook_rebuild().
++ */
++function flysystem_rebuild() {
++  Drupal::service('flysystem_factory')->ensure();
++}
++
+ /**
+  * Implements hook_file_download().
+  */
+ function flysystem_file_download($uri) {
+-  $schemes = [];
+-  $config_storage = \Drupal::service('config.storage');
+-  $entity_config_names = $config_storage->listAll('flysystem.flysystem_adapter_config');
+-  $configured_entities = $config_storage->readMultiple($entity_config_names);
+-  foreach ($configured_entities as $value) {
+-    $schemes[] = $value['id'];
+-  }
+-
++  $schemes = Drupal::service('flysystem_factory')->getSchemes();
+   $scheme = StreamWrapperManager::getScheme($uri);
+ 
+   if (!$scheme || !in_array($scheme, $schemes, TRUE)) {
+@@ -34,7 +42,7 @@ function flysystem_file_download($uri) {
+   }
+ 
+   return [
+-    'Content-Type' => \Drupal::service('file.mime_type.guesser.extension')->guessMimeType($uri),
++    'Content-Type' => Drupal::service('file.mime_type.guesser.extension')->guessMimeType($uri),
+     'Content-Length' => filesize($uri),
+   ];
+ }
+@@ -45,7 +53,6 @@ function flysystem_file_download($uri) {
+  * @see Drupal\file\FileAccessControlHandler
+  */
+ function flysystem_entity_access(EntityInterface $entity, $operation, AccountInterface $account) {
+-  $schemes = [];
+   if (!$entity instanceof FileInterface) {
+     return AccessResult::neutral();
+   }
+@@ -54,18 +61,19 @@ function flysystem_entity_access(EntityInterface $entity, $operation, AccountInt
+     return AccessResult::neutral();
+   }
+ 
+-  $config_storage = \Drupal::service('config.storage');
+-  $entity_config_names = $config_storage->listAll('flysystem.flysystem_adapter_config');
+-  $configured_entities = $config_storage->readMultiple($entity_config_names);
+-  foreach ($configured_entities as $value) {
+-    $schemes[] = $value['id'];
+-  }
+-
++  $schemes = Drupal::service('flysystem_factory')->getSchemes();
+   $scheme = StreamWrapperManager::getScheme($entity->getFileUri());
++
+   if (!$scheme || !in_array($scheme, $schemes, TRUE)) {
+     return AccessResult::neutral();
+   }
+ 
++  $settings = Settings::get('flysystem', []);
++
++  if (empty($settings[$scheme]['config']['public'])) {
++    return AccessResult::neutral();
++  }
++
+   if ($operation === 'download') {
+     return AccessResult::allowed();
+   }
+diff --git a/flysystem.permissions.yml b/flysystem.permissions.yml
+index 101f4fb..4db3f66 100644
+--- a/flysystem.permissions.yml
++++ b/flysystem.permissions.yml
+@@ -1,3 +1,7 @@
++administer flysystem:
++  title: 'Administer Flysystem'
++  description: 'Sync Flysystem filesystems.'
++  restrict access: 'TRUE'
+ administer flysystem_adapter_config:
+   title: 'Manage configuration of Flysystem Adapters'
+   descriiption:  'Manage configuration of League/Flysystem Filesystem Adapters'
+diff --git a/flysystem.routing.yml b/flysystem.routing.yml
+index 0bb0d43..5bd4be5 100644
+--- a/flysystem.routing.yml
++++ b/flysystem.routing.yml
+@@ -29,3 +29,47 @@ entity.flysystem_adapter_config.delete_form:
+     _title: 'Delete a configured Flysystem Adapter'
+   requirements:
+     _permission: 'administer flysystem_adapter_config'
++
++flysystem.files:
++  path: '/_flysystem/{scheme}'
++  defaults:
++    _controller: 'Drupal\system\FileDownloadController::download'
++    _disable_route_normalizer: TRUE
++  requirements:
++    # Permissions are handled through Drupal file create / update permissions
++    _access: 'TRUE'
++    scheme: '^[a-zA-Z0-9+.-]+$'
++  options:
++    _maintenance_access: TRUE
++
++flysystem.serve:
++  path: '/_flysystem/{scheme}/{filepath}'
++  defaults:
++    _controller: 'Drupal\system\FileDownloadController::download'
++    _disable_route_normalizer: TRUE
++  requirements:
++    # Permissions are handled through Drupal access content permissions
++    _access: 'TRUE'
++    scheme: '^[a-zA-Z0-9+.-]+$'
++    filepath: .+
++  options:
++    _maintenance_access: TRUE
++
++flysystem.config:
++  path: '/admin/config/media/file-system/flysystem'
++  defaults:
++    _form: 'Drupal\flysystem\Form\ConfigForm'
++    _title: Flysystem
++  requirements:
++    _permission: 'administer flysystem'
++
++flysystem.migrate_field:
++  path: '/admin/config/media/file-system/flysystem/field-migration'
++  defaults:
++    _form: 'Drupal\flysystem\Form\FieldMigration'
++    _title: 'Field migration'
++  requirements:
++    _permission: 'administer flysystem'
++
++route_callbacks:
++  - 'Drupal\flysystem\Routing\FlysystemRoutes::routes'
+diff --git a/flysystem.services.yml b/flysystem.services.yml
+index 8066417..0890692 100644
+--- a/flysystem.services.yml
++++ b/flysystem.services.yml
+@@ -1,24 +1,41 @@
+ services:
+-  ## Service Decorators
+-  # Decorates the Core FileSystem service
+-  flysystem.filesystem:
+-    class: Drupal\flysystem\Decorator\FlysystemDrupalFileSystem
+-    public: false
+-    decorates: file_system
+-    decoration_priority: 1
+-    arguments: ['@flysystem.filesystem.inner', '@stream_wrapper_manager', '@settings']
+-
+   cache.flysystem:
+     class: Drupal\Core\Cache\CacheBackendInterface
+     tags:
+       - { name: cache.bin }
+     factory: 'cache_factory:get'
+-    arguments: ['flysystem']
++    arguments: [flysystem]
+ 
+   logger.channel.flysystem:
+     parent: logger.channel_base
+     arguments: ['flysystem']
+ 
+-  plugin.manager.flysystem_adapter:
+-    class: Drupal\flysystem\FlysystemAdapterPluginManager
+-    parent: default_plugin_manager
++  plugin.manager.flysystem:
++    class: Drupal\flysystem\Plugin\FlysystemPluginManager
++    arguments: ['@container.namespaces', '@cache.discovery', '@module_handler']
++
++  flysystem_factory:
++    class: Drupal\flysystem\FlysystemFactory
++    arguments: ['@plugin.manager.flysystem', '@stream_wrapper_manager', '@cache.flysystem', '@event_dispatcher']
++
++  path_processor.flysystem:
++    class: Drupal\flysystem\PathProcessor\FlysystemPathProcessor
++    tags:
++      - { name: path_processor_inbound, priority: 200 }
++
++  flysystem.ensure_subscriber:
++    class: Drupal\flysystem\EventSubscriber\EnsureSubscriber
++    arguments: ['@logger.channel.flysystem']
++    tags:
++      - { name: event_subscriber }
++
++  flysystem.image_style_copier:
++    class: Drupal\flysystem\ImageStyleCopier
++    arguments: ['@lock', '@file_system', '@logger.channel.image', '@entity_type.manager', '@cache_tags.invalidator']
++    tags:
++      - { name: event_subscriber }
++
++  path_processor.flysystem_redirect:
++    class: Drupal\flysystem\PathProcessor\FlysystemImageStyleRedirectProcessor
++    tags:
++      - { name: path_processor_inbound, priority: 400 }
+diff --git a/modules/flysystem_local/flysystem_local.info.yml b/modules/flysystem_local/flysystem_local.info.yml
+index 2451230..805f676 100644
+--- a/modules/flysystem_local/flysystem_local.info.yml
++++ b/modules/flysystem_local/flysystem_local.info.yml
+@@ -2,6 +2,6 @@ name: 'Flysystem Local Filesytem Adapter'
+ type: module
+ description: 'Flysystem Local Filesystem Adapter.'
+ package: 'Flysystem'
+-core_version_requirement: ^10
++core_version_requirement: ^10.3 || ^11
+ dependencies:
+   - flysystem:flysystem
+diff --git a/modules/flysystem_local/src/Plugin/FlysystemAdapter/LocalAdapter.php b/modules/flysystem_local/src/Plugin/FlysystemAdapter/LocalAdapter.php
+index d1ae706..1fae0cc 100644
+--- a/modules/flysystem_local/src/Plugin/FlysystemAdapter/LocalAdapter.php
++++ b/modules/flysystem_local/src/Plugin/FlysystemAdapter/LocalAdapter.php
+@@ -55,7 +55,7 @@ final class LocalAdapter extends FlysystemAdapterPluginBase implements Flysystem
+   /**
+    * The League\Flysystem\FilesytemAdapter class for this adapter.
+    */
+-  static protected string $flysystemAdapterClass = 'League\Flysystem\Local\LocalFilesystemAdapter';
++  protected static string $flysystemAdapterClass = 'League\Flysystem\Local\LocalFilesystemAdapter';
+ 
+   /**
+    * The fully qualified name of this class.
+diff --git a/src/Asset/SchemeExtensionTrait.php b/src/Asset/SchemeExtensionTrait.php
+deleted file mode 100644
+index f971bcb..0000000
+--- a/src/Asset/SchemeExtensionTrait.php
++++ /dev/null
+@@ -1,35 +0,0 @@
+-<?php
+-
+-namespace Drupal\flysystem\Asset;
+-
+-use Drupal\Core\Site\Settings;
+-
+-/**
+- * Flysystem dependency injection container.
+- */
+-trait SchemeExtensionTrait {
+-
+-  /**
+-   * Returns the scheme that should serve an extension.
+-   *
+-   * @param string $extension
+-   *   The extension.
+-   *
+-   * @return string
+-   *   The scheme that should serve the extension.
+-   */
+-  public function getSchemeForExtension($extension) {
+-
+-    $extension_scheme = 'public';
+-
+-    foreach (Settings::get('flysystem', []) as $scheme => $configuration) {
+-      if (!empty($configuration['serve_' . $extension]) && !empty($configuration['driver'])) {
+-        // Don't break, the last configured one will win.
+-        $extension_scheme = $scheme;
+-      }
+-    }
+-
+-    return $extension_scheme;
+-  }
+-
+-}
+diff --git a/src/Decorator/FlysystemDrupalFileSystem.php b/src/Decorator/FlysystemDrupalFileSystem.php
+deleted file mode 100644
+index 264d48a..0000000
+--- a/src/Decorator/FlysystemDrupalFileSystem.php
++++ /dev/null
+@@ -1,265 +0,0 @@
+-<?php
+-
+-namespace Drupal\flysystem\Decorator;
+-
+-use Drupal\Component\Utility\Unicode;
+-use Drupal\Core\File\Exception\FileException;
+-use Drupal\Core\File\Exception\FileWriteException;
+-use Drupal\Core\File\Exception\InvalidStreamWrapperException;
+-use Drupal\Core\File\FileExists;
+-use Drupal\Core\File\FileSystem;
+-use Drupal\Core\Site\Settings;
+-use Drupal\Core\StreamWrapper\StreamWrapperManager;
+-use Drupal\Core\StreamWrapper\StreamWrapperManagerInterface;
+-use Drupal\flysystem\FlyStream\FlyStreamWrapperInterface;
+-
+-/**
+- * Decorates \Drupal::service('file_system').
+- *
+- * Unmodified public methods:
+- * - ::basename
+- * - ::getTempDirectory.
+- *
+- * The trait FlysystemFileSystemTrait contains the logic that is passed to the
+- * Flysystem Stream Wrapper instance.
+- *
+- * @see Drupal\Core\File\FileSystemInteface
+- * @see Drupal\Core\File\FileSystem
+- */
+-class FlysystemDrupalFileSystem extends FileSystem {
+-
+-  use FlysystemFileSystemTrait;
+-
+-  /**
+-   * The inner service.
+-   *
+-   * @var \Drupal\Core\File\FileSystem
+-   */
+-  protected $decoratedService;
+-
+-  /**
+-   * The site settings.
+-   *
+-   * @var \Drupal\Core\Site\Settings
+-   */
+-  protected $settings;
+-
+-  /**
+-   * The stream wrapper manager.
+-   *
+-   * @var \Drupal\Core\StreamWrapper\StreamWrapperManagerInterface
+-   */
+-  protected $streamWrapperManager;
+-
+-  /**
+-   * Constructs a new FileSystem.
+-   *
+-   * Leverages Drupal's existing FileSystem object, enhanced by Flysystem's
+-   * Adapters.
+-   *
+-   * Flysystem Adapters are implemented as part of instantiating a Flysystem
+-   * Operator.  In this module, Flysystem Operators are registered using
+-   * Drupal's StreamWrapperManager.
+-   *
+-   * @param \Drupal\Core\File\FileSystem $decorated_service
+-   *   Drupal Core's FileSystem service, which is being decorated here.
+-   * @param \Drupal\Core\StreamWrapper\StreamWrapperManagerInterface $stream_wrapper_manager
+-   *   The stream wrapper manager.
+-   * @param \Drupal\Core\Site\Settings $settings
+-   *   The site settings.
+-   */
+-  public function __construct(FileSystem $decorated_service, StreamWrapperManagerInterface $stream_wrapper_manager, Settings $settings) {
+-    $this->decoratedService = $decorated_service;
+-    $this->streamWrapperManager = $stream_wrapper_manager;
+-    $this->settings = $settings;
+-  }
+-
+-  /**
+-   * {@inheritdoc}
+-   *
+-   * @todo rewrite to leverage Flysystem (yes)
+-   * @see \Drupal\Core\File\FileSystem::moveUploadedFile()
+-   */
+-  public function moveUploadedFile($filename, $uri) {
+-    return $this->decoratedService->moveUploadedFile($filename, $uri);
+-  }
+-
+-  /**
+-   * {@inheritdoc}
+-   */
+-  public function chmod($uri, $mode = NULL) {
+-    if (!isset($mode)) {
+-      /** @var \Drupal\Core\StreamWrapper\StreamWrapperInterface $wrapper */
+-      $wrapper = $this->streamWrapperManager->getViaUri($uri);
+-      if ($wrapper instanceof FlyStreamWrapperInterface) {
+-        return $this->chmodFs($wrapper, $uri, $mode);
+-      }
+-    }
+-    return $this->decoratedService->chmod($uri, $mode);
+-  }
+-
+-  /**
+-   * {@inheritdoc}
+-   */
+-  public function mkdir($uri, $mode = NULL, $recursive = FALSE, $context = NULL) {
+-    /** @var \Drupal\Core\StreamWrapper\StreamWrapperInterface $wrapper */
+-    $wrapper = $this->streamWrapperManager->getViaUri($uri);
+-    if ($wrapper instanceof FlyStreamWrapperInterface) {
+-      return $this->mkdirFs($wrapper, $uri, $mode, $recursive, $context);
+-    }
+-    return $this->decoratedService->mkdir($uri, $mode, $recursive, $context);
+-  }
+-
+-  /**
+-   * {@inheritdoc}
+-   *
+-   * @todo finish writing, see inline todo comments.
+-   */
+-  public function rmdir($uri, $context = NULL) {
+-    /** @var \Drupal\Core\StreamWrapper\StreamWrapperInterface $wrapper */
+-    $wrapper = $this->streamWrapperManager->getViaUri($uri);
+-    if ($wrapper instanceof FlyStreamWrapperInterface) {
+-      return $this->rmdirFs($wrapper, $uri, $context);
+-    }
+-    return $this->decoratedService->rmdir($uri, $context);
+-  }
+-
+-  /**
+-   * {@inheritdoc}
+-   */
+-  public function copy($source, $destination, $fileExists = FileExists::Rename) {
+-    /** @var \Drupal\Core\StreamWrapper\StreamWrapperInterface $wrapper */
+-    $wrapper = $this->streamWrapperManager->getViaScheme(StreamWrapperManager::getScheme($source));
+-    if ($wrapper instanceof FlyStreamWrapperInterface) {
+-      return $this->copyFs($wrapper, $source, $destination, $fileExists);
+-    }
+-    return $this->decoratedService->copy($source, $destination, $fileExists);
+-  }
+-
+-  /**
+-   * {@inheritdoc}
+-   */
+-  public function delete($path) {
+-    /** @var \Drupal\Core\StreamWrapper\StreamWrapperManager $wrapper */
+-    $wrapper = $this->streamWrapperManager->getViaUri($path);
+-    if ($wrapper instanceof FlyStreamWrapperInterface) {
+-      return $this->deleteFs($wrapper, $path);
+-    }
+-    return $this->decoratedService->delete($path);
+-  }
+-
+-  /**
+-   * {@inheritdoc}
+-   */
+-  public function deleteRecursive($path, callable $callback = NULL) {
+-    if ($callback) {
+-      return $this->decoratedService->deleteRecursive($path, $callback);
+-    }
+-    /** @var \Drupal\Core\StreamWrapper\StreamWrapperInterface $wrapper */
+-    $wrapper = $this->streamWrapperManager->getViaUri($path);
+-    if ($wrapper instanceof FlyStreamWrapperInterface) {
+-      return $this->deleteRecursiveFs($wrapper, $path, $callback);
+-    }
+-    return $this->decoratedService->deleteRecursive($path, NULL);
+-  }
+-
+-  /**
+-   * {@inheritdoc}
+-   */
+-  public function move($source, $destination, $fileExists = FileExists::Rename) {
+-    /** @var \Drupal\Core\StreamWrapper\StreamWrapperInterface $wrapper */
+-    $wrapper = $this->streamWrapperManager->getViaScheme(StreamWrapperManager::getScheme($source));
+-    if ($wrapper instanceof FlyStreamWrapperInterface) {
+-      return $this->moveFs($wrapper, $source, $destination, $fileExists);
+-    }
+-    return $this->decoratedService->move($source, $destination, $fileExists);
+-  }
+-
+-  /**
+-   * {@inheritdoc}
+-   */
+-  public function saveData($data, $destination, $fileExists = FileExists::Rename) {
+-    // Write the data to a temporary file.
+-    // The assumption here is that temporary files will always use the local
+-    // filespace.
+-    $temp_name = $this->tempnam('temporary://', 'file');
+-    if (file_put_contents($temp_name, $data) === FALSE) {
+-      throw new FileWriteException("Temporary file '$temp_name' could not be created.");
+-    }
+-    if (!$this->streamWrapperManager->isValidUri($destination)) {
+-      throw new InvalidStreamWrapperException("Invalid stream wrapper: {$destination}");
+-    }
+-    /** @var \Drupal\Core\StreamWrapper\StreamWrapperInterface $wrapper */
+-    $wrapper = $this->streamWrapperManager->getViaScheme(StreamWrapperManager::getScheme($destination));
+-    if ($wrapper instanceof FlyStreamWrapperInterface) {
+-      return $this->saveDataFs($wrapper, $temp_name, $destination, $fileExists);
+-    }
+-    return $this->decoratedService->move($temp_name, $destination, $fileExists);
+-  }
+-
+-  /**
+-   * {@inheritdoc}
+-   */
+-  public function prepareDirectory(&$directory, $options = self::MODIFY_PERMISSIONS) {
+-    if (!$this->streamWrapperManager->isValidUri($directory)) {
+-      // Only trim if we're not dealing with a stream.
+-      $directory = rtrim($directory, '/\\');
+-    }
+-    /** @var \Drupal\Core\StreamWrapper\StreamWrapperInterface $wrapper */
+-    $wrapper = $this->streamWrapperManager->getViaScheme(StreamWrapperManager::getScheme($directory));
+-    if ($wrapper instanceof FlyStreamWrapperInterface) {
+-      return $this->prepareDirectoryFs($wrapper, $directory, $options);
+-    }
+-    return $this->decoratedService->prepareDirectory($directory, $options);
+-  }
+-
+-  /**
+-   * {@inheritdoc}
+-   */
+-  public function createFilename($basename, $directory) {
+-    $original = $basename;
+-    // Strip control characters (ASCII value < 32). Though these are allowed in
+-    // some filesystems, not many applications handle them well.
+-    $basename = preg_replace('/[\x00-\x1F]/u', '_', $basename);
+-    if (preg_last_error() !== PREG_NO_ERROR) {
+-      throw new FileException(sprintf("Invalid filename '%s'", $original));
+-    }
+-    if (str_starts_with(PHP_OS, 'WIN')) {
+-      // These characters are not allowed in Windows filenames.
+-      $basename = str_replace([':', '*', '?', '"', '<', '>', '|'], '_', $basename);
+-    }
+-
+-    // A URI or path may already have a trailing slash or look like "public://".
+-    if (str_ends_with($directory, '/')) {
+-      $separator = '';
+-    }
+-    else {
+-      $separator = '/';
+-    }
+-    $destination = $directory . $separator . $basename;
+-
+-    /** @var \Drupal\Core\StreamWrapper\StreamWrapperInterface $wrapper */
+-    $wrapper = $this->streamWrapperManager->getViaScheme(StreamWrapperManager::getScheme($destination));
+-    if ($wrapper instanceof FlyStreamWrapperInterface) {
+-      return $this->createFilenameFs($wrapper, $separator, $destination, $basename, $directory);
+-    }
+-    return $this->decoratedService->createFilename($basename, $directory);
+-  }
+-
+-  /**
+-   * {@inheritdoc}
+-   */
+-  public function getDestinationFilename($destination, $fileExists) {
+-    $basename = $this->basename($destination);
+-    if (!Unicode::validateUtf8($basename)) {
+-      throw new FileException(sprintf("Invalid filename '%s'", $basename));
+-    }
+-    /** @var \Drupal\Core\StreamWrapper\StreamWrapperInterface $wrapper */
+-    $wrapper = $this->streamWrapperManager->getViaScheme(StreamWrapperManager::getScheme($destination));
+-    if ($wrapper instanceof FlyStreamWrapperInterface) {
+-      return $this->getDestinationFilenameFs($wrapper, $basename, $destination, $fileExists);
+-    }
+-    return $this->decoratedService->getDestinationFilename($destination, $fileExists);
+-  }
+-
+-}
+diff --git a/src/Decorator/FlysystemFileSystemTrait.php b/src/Decorator/FlysystemFileSystemTrait.php
+deleted file mode 100644
+index 3d8d2d1..0000000
+--- a/src/Decorator/FlysystemFileSystemTrait.php
++++ /dev/null
+@@ -1,468 +0,0 @@
+-<?php
+-
+-namespace Drupal\flysystem\Decorator;
+-
+-use Drupal\Core\File\Exception\NotRegularFileException;
+-use Drupal\Core\File\FileExists;
+-
+-/**
+- * League\Flysystem\Filesystem to Drupal\Core\File\FileSystem conversion.
+- *
+- * Contains all logic to convert Drupal's FileSystem service methods to utilize
+- * League\Flysystem\Filesystem methods and logic.
+- *
+- * The purpose of this trait is to isolate the logic specific to this logic
+- * conversion into one maintainable class, separate from the decorator logic
+- * itself, which is pretty straightforward.
+- */
+-trait FlysystemFileSystemTrait {
+-
+-  /**
+-   * Converts Drupal's FileSystem::chmod() to FilesystemOperator methods.
+-   *
+-   * @param \Drupal\flysystem\FlyStream\FlyStreamWrapperInterface $wrapper
+-   *   Drupal StreamWrapper service.
+-   * @param string $uri
+-   *   A string containing a URI file, or directory path.
+-   * @param int $mode
+-   *   Integer value for permissions.
+-   *
+-   * @return bool
+-   *   TRUE for success, FALSE in the event of an error.
+-   */
+-  protected function chmodFs($wrapper, $uri, $mode = NULL): bool {
+-    \Drupal::logger('flysystem')->notice('Calling ' . __METHOD__ . ', uri: ' . $uri);
+-    try {
+-      $drupalMode = NULL;
+-      if ($wrapper->filesystem->directoryExists($uri)) {
+-        // @todo May have to write a Flysystem VisibilityConverter for
+-        // Local file adapter that substitutes Drupal file and directory
+-        // permission settings for the default settings in Flysystem.
+-        $drupalMode = $this->settings->get('file_chmod_directory', static::CHMOD_DIRECTORY);
+-      }
+-      elseif ($wrapper->filesystem->fileExists($uri)) {
+-        $drupalMode = $this->settings->get('file_chmod_file', static::CHMOD_FILE);
+-      }
+-      $wrapper->filesystem->setVisibility($uri, $drupalMode);
+-      return TRUE;
+-    }
+-    catch (\Exception $e) {
+-      \Drupal::logger('FlyStreamWrapper')->error('Exception: ' . $e->getMessage());
+-      // @todo write exception handler for possible exceptions thrown
+-      // by FlysystemAdapter::setVisibility();
+-    }
+-    return FALSE;
+-  }
+-
+-  /**
+-   * Converts Drupal's FileSystem::mkdir() to FilesystemOperator methods.
+-   *
+-   * @param \Drupal\flysystem\FlyStream\FlyStreamWrapperInterface $wrapper
+-   *   Drupal StreamWrapper service.
+-   * @param string $uri
+-   *   A URI or pathname.
+-   * @param int $mode
+-   *   Mode given to created directories. Defaults to the directory mode
+-   *   configured in the Drupal installation. It must have a leading zero.
+-   * @param bool $recursive
+-   *   Create directories recursively, defaults to FALSE. Cannot work with a
+-   *   mode which denies writing or execution to the owner of the process.
+-   * @param resource $context
+-   *   Refer to http://php.net/manual/ref.stream.php.
+-   *
+-   * @return bool
+-   *   Boolean TRUE on success, or FALSE on failure.
+-   *
+-   * @todo finish writing, see inline todo comments.
+-   */
+-  protected function mkdirFs($wrapper, $uri, $mode = NULL, $recursive = FALSE, $context = NULL): bool {
+-    \Drupal::logger('flysystem')->notice('Calling ' . __METHOD__ . ', uri: ' . $uri);
+-    if (!isset($mode)) {
+-      $mode = $this->settings->get('file_chmod_directory', static::CHMOD_DIRECTORY);
+-    }
+-
+-    try {
+-      // @todo figure out how to utilize directory permissions, see notes on
+-      // Flysystem VisibilityConverter.
+-      // @see \League\Flysystem\Filesystem::createDirectory()
+-      $wrapper->filesystem->createDirectory($uri);
+-      return TRUE;
+-    }
+-    catch (\Exception $e) {
+-      \Drupal::logger('FlyStreamWrapper')->error('Exception: ' . $e->getMessage());
+-      \Drupal::logger('FlyStreamWrapper')->error('Failed to create directory for ' . $uri);
+-      // @todo write exception handler to handle Flysystem Exception, and
+-      // return a proper return code, which is FALSE.
+-    }
+-    return FALSE;
+-  }
+-
+-  /**
+-   * Converts Drupal's FileSystem::rmdir() to FilesystemOperator methods.
+-   *
+-   * @param \Drupal\flysystem\FlyStream\FlyStreamWrapperInterface $wrapper
+-   *   Drupal StreamWrapper service.
+-   * @param string $uri
+-   *   A URI or pathname.
+-   * @param resource $context
+-   *   Refer to http://php.net/manual/ref.stream.php.
+-   *
+-   * @return bool
+-   *   Boolean TRUE on success, or FALSE on failure.
+-   *
+-   * @todo finish writing, see inline todo comments.
+-   */
+-  protected function rmdirFs($wrapper, $uri, $context = NULL): bool {
+-    \Drupal::logger('flysystem')->notice('Calling ' . __METHOD__ . ', uri: ' . $uri);
+-    try {
+-      // @todo figure out how to utilize directory permissions, see notes on
+-      // Flysystem VisibilityConverter.
+-      // @see \League\Flysystem\Filesystem::deleteDirectory()
+-      $wrapper->filesystem->deleteDirectory($uri);
+-      return TRUE;
+-    }
+-    catch (\Exception $e) {
+-      \Drupal::logger('FlyStreamWrapper')->error('Exception: ' . $e->getMessage());
+-      // @todo write exception handler to handle Flysystem Exception, and
+-      // return a proper return code, which is FALSE.
+-    }
+-    return FALSE;
+-  }
+-
+-  /**
+-   * Converts Drupal's FileSystem::copy() to FilesystemOperator methods.
+-   *
+-   * @param \Drupal\flysystem\FlyStream\FlyStreamWrapperInterface $wrapper
+-   *   Drupal StreamWrapper service.
+-   * @param string $source
+-   *   A string specifying the filepath or URI of the source file.
+-   * @param string $destination
+-   *   A URI containing the destination that $source should be copied to. The
+-   *   URI may be a bare filepath (without a scheme).
+-   * @param \Drupal\Core\File\FileExists|int $fileExists
+-   *   The behavior when the destination file already exists.
+-   *
+-   * @return string
+-   *   The path to the new file.
+-   *
+-   * @todo Rewrite to leverage Flysystem (yes)
+-   */
+-  protected function copyFs($wrapper, $source, $destination, $fileExists): string {
+-    \Drupal::logger('flysystem')->notice('Calling ' . __METHOD__ . ', source: ' . $source . ', destination: ' . $destination);
+-    try {
+-      // @todo figure out how to utilize directory permissions, see notes on
+-      // Flysystem VisibilityConverter.
+-      // @see \League\Flysystem\Filesystem::copy().
+-      $wrapper->filesystem->copy($source, $destination);
+-      return $destination;
+-    }
+-    catch (\Exception $e) {
+-      \Drupal::logger('FlyStreamWrapper')->error('Exception: ' . $e->getMessage());
+-      // @todo write exception handler to handle Flysystem Exception, and
+-      // return a proper return code, which is FALSE.
+-    }
+-    return '';
+-  }
+-
+-  /**
+-   * Converts Drupal's FileSystem::delete() to FilesystemOperator methods.
+-   *
+-   * @param \Drupal\flysystem\FlyStream\FlyStreamWrapperInterface $wrapper
+-   *   Drupal StreamWrapper service.
+-   * @param string $path
+-   *   A string containing a file path or (streamwrapper) URI.
+-   *
+-   * @return true
+-   *   Always return true, unless an exception is thrown.
+-   *
+-   * @todo finish writing, see inline todo comments.
+-   */
+-  protected function deleteFs($wrapper, $path) {
+-    \Drupal::logger('flysystem')->notice('Calling ' . __METHOD__ . ', path: ' . $path);
+-    if ($wrapper->filesystem->directoryExists($path)) {
+-      throw new NotRegularFileException("Cannot delete '$path' because it is a directory. Use deleteRecursive() instead.");
+-    }
+-    if ($wrapper->filesystem->fileExists($path)) {
+-      try {
+-        $wrapper->filesystem->delete($path);
+-      }
+-      catch (\Exception $e) {
+-        \Drupal::logger('FlyStreamWrapper')->error('Exception: ' . $e->getMessage());
+-        // @todo modify \Exception to use class from Flysystem,
+-        // and throw a proper exception.
+-      }
+-    }
+-    // If file does not exist, return TRUE, that is the intended result.
+-    return TRUE;
+-  }
+-
+-  /**
+-   * Drupal's FileSystem::deleteRecursive() to FilesystemOperator methods.
+-   *
+-   * @param \Drupal\flysystem\FlyStream\FlyStreamWrapperInterface $wrapper
+-   *   Drupal StreamWrapper service.
+-   * @param string $path
+-   *   A string containing either an URI or a file or directory path.
+-   * @param callable|null $callback
+-   *   Callback function to run on each file prior to deleting it and on each
+-   *   directory prior to traversing it. For example, can be used to modify
+-   *   permissions.
+-   *
+-   * @return bool
+-   *   TRUE if successful, FALSE if not.
+-   */
+-  protected function deleteRecursiveFs($wrapper, $path, callable $callback = NULL):  bool {
+-    \Drupal::logger('flysystem')->notice('Calling ' . __METHOD__ . ', path: ' . $path);
+-    if (!$wrapper->filesystem->fileExists($path)) {
+-      return TRUE;
+-    }
+-
+-    if ($wrapper->filesystem->directoryExists($path)) {
+-      $dir = $wrapper->filesystem->listContents($path);
+-      foreach ($dir as $entry) {
+-        $entry_path = $path . '/' . $entry->path();
+-        $this->deleteRecursive($entry_path, $callback);
+-      }
+-      return $this->rmdir($path);
+-    }
+-    return $this->delete($path);
+-  }
+-
+-  /**
+-   * Converts Drupal's FileSystem::move() to FilesystemOperator methods.
+-   *
+-   * @param \Drupal\flysystem\FlyStream\FlyStreamWrapperInterface $wrapper
+-   *   Drupal StreamWrapper service.
+-   * @param string $source
+-   *   A string specifying the filepath or URI of the source file.
+-   * @param string $destination
+-   *   A URI containing the destination that $source should be moved to. The
+-   *   URI may be a bare filepath (without a scheme) and in that case the
+-   *   default scheme (public://) will be used.
+-   * @param \Drupal\Core\File\FileExists|int $fileExists
+-   *   Replace behavior when the destination file already exists.
+-   *
+-   * @return string
+-   *   The path to the new file.
+-   *
+-   * @todo finish writing, see inline todo comments.
+-   */
+-  protected function moveFs($wrapper, $source, $destination, $fileExists): string {
+-    \Drupal::logger('flysystem')->notice('Calling ' . __METHOD__ . ', source: ' . $source . ', destination: ' . $destination);
+-    try {
+-      // @todo figure out how to utilize directory permissions, see notes on
+-      // Flysystem VisibilityConverter.
+-      // @see \League\Flysystem\Filesystem::move().
+-      // What do we do with the $replace flag?
+-      $wrapper->filesystem->move($source, $destination);
+-      return $destination;
+-    }
+-    catch (\Exception $e) {
+-      \Drupal::logger('FlyStreamWrapper')->error('Exception: ' . $e->getMessage());
+-      // @todo write exception handler to handle Flysystem Exception, and
+-      // return a proper return code, which is FALSE.
+-    }
+-    return '';
+-  }
+-
+-  /**
+-   * Converts Drupal's FileSystem::saveData() to FilesystemOperator methods.
+-   *
+-   * @param \Drupal\flysystem\FlyStream\FlyStreamWrapperInterface $wrapper
+-   *   Drupal StreamWrapper service.
+-   * @param string $temp_nam
+-   *   A string containing the contents of the file, moved to a temporary
+-   *   location.
+-   * @param string $destination
+-   *   A string containing the destination location. This must be a stream
+-   *   wrapper URI.
+-   * @param \Drupal\Core\File\FileExists|int $fileExists
+-   *   Replace behavior when the destination file already exists.
+-   *
+-   * @return string
+-   *   A string with the path of the resulting file, or FALSE on error.
+-   *
+-   * @todo finish writing, see inline todo comments.
+-   */
+-  protected function saveDataFs($wrapper, $temp_nam, $destination, $fileExists) {
+-    \Drupal::logger('flysystem')->notice('Calling ' . __METHOD__ . ', temp_nam: ' . $temp_nam . ', destination: ' . $destination);
+-    // Move the file to its final destination.
+-    try {
+-      // @todo figure out how to utilize directory permissions, see notes on
+-      // Flysystem VisibilityConverter.
+-      // @see \League\Flysystem\Filesystem::move().
+-      // Do we need to use the $replace flag here in the FlysystemAdapter?
+-      $wrapper->filesystem->move($temp_nam, $destination);
+-      return $destination;
+-    }
+-    catch (\Exception $e) {
+-      \Drupal::logger('FlyStreamWrapper')->error('Exception: ' . $e->getMessage());
+-      // @todo write exception handler to handle Flysystem Exception, and
+-      // return a proper return code, which is FALSE.
+-    }
+-    return '';
+-  }
+-
+-  /**
+-   * Drupal's FileSystem::prepareDirectory() to FilesystemOperator methods.
+-   *
+-   * @param \Drupal\flysystem\FlyStream\FlyStreamWrapperInterface $wrapper
+-   *   Drupal StreamWrapper service.
+-   * @param string $directory
+-   *   A string reference containing the name of a directory path or URI. A
+-   *   trailing slash will be trimmed from a path.
+-   * @param int $options
+-   *   A bitmask to indicate if the directory should be created if it does
+-   *   not exist (FileSystemInterface::CREATE_DIRECTORY) or made writable if it
+-   *   is read-only (FileSystemInterface::MODIFY_PERMISSIONS).
+-   *
+-   * @return bool
+-   *   TRUE if the directory exists (or was created) and is writable. FALSE
+-   *   otherwise.
+-   *
+-   * @todo finish writing, see inline todo comments.
+-   * @see \League\Flysystem\FilesystemOperator::directoryExists()
+-   */
+-  protected function prepareDirectoryFs($wrapper, &$directory, $options): bool {
+-    \Drupal::logger('flysystem')->notice('Calling ' . __METHOD__ . ', directory: ' . $directory);
+-    if (!$this->streamWrapperManager->isValidUri($directory)) {
+-      // Only trim if we're not dealing with a stream.
+-      $directory = rtrim($directory, '/\\');
+-    }
+-    // How do we use the flags, self::MODIFY_PERMISSIONS and
+-    // static::CREATE_DIRECTORY here?
+-    // @see Drupal\Core\File\FileSystemInterface::prepareDirectory().
+-    try {
+-      // Let mkdir() recursively create directories and use the default
+-      // directory permissions.
+-      $success = $this->mkdir($directory, NULL, TRUE);
+-      if ($success) {
+-        return TRUE;
+-      }
+-      // If the operation failed, check again if the directory was created
+-      // by another process/server, only report a failure if not. In this case
+-      // we still need to ensure the directory is writable.
+-      if (!is_dir($directory)) {
+-        return FALSE;
+-      }
+-    }
+-    catch (\Exception $e) {
+-      \Drupal::logger('FlyStreamWrapper')->error('Exception: ' . $e->getMessage());
+-      // @todo write exception handler to handle Flysystem Exception, and
+-      // return a proper return code, which is FALSE.
+-    }
+-    // If the operation failed, check again if the directory was created
+-    // by another process/server, only report a failure if not. In this case
+-    // we still need to ensure the directory is writable.
+-    if (!$wrapper->filesystem->directoryExists($directory)) {
+-      return FALSE;
+-    }
+-    $writable = is_writable($directory);
+-    if (!$writable && ($options & static::MODIFY_PERMISSIONS)) {
+-      return $this->chmod($directory);
+-    }
+-    return $writeable;
+-  }
+-
+-  /**
+-   * Drupal's FileSystem::createFilename() to FilesystemOperator methods.
+-   *
+-   * @param \Drupal\flysystem\FlyStream\FlyStreamWrapperInterface $wrapper
+-   *   Drupal StreamWrapper service.
+-   * @param string $separator
+-   *   The pathname separator.
+-   * @param string $destination
+-   *   The destination filename.
+-   * @param string $basename
+-   *   The filename.
+-   * @param string $directory
+-   *   The directory or parent URI.
+-   *
+-   * @return string
+-   *   File path consisting of $directory and a unique filename based off
+-   *   of $basename.
+-   *
+-   * @todo finish writing, see inline todo comments.
+-   * @todo reevaluate against \Drupal\Core\File\FileSystem::createFilename().
+-   */
+-  protected function createFilenameFs($wrapper, $separator, $destination, $basename, $directory): string {
+-    \Drupal::logger('flysystem')->notice('Calling ' . __METHOD__ . ', separator: ' . $separator . ', destination: ' . $destination . ', basename: ' . $basename . ', directory: ' . $directory);
+-    try {
+-      $exists = $wrapper->filesystem->fileExists($destination);
+-      if ($exists) {
+-        // Destination file already exists, generate an alternative.
+-        $pos = strrpos($basename, '.');
+-        if ($pos !== FALSE) {
+-          $name = substr($basename, 0, $pos);
+-          $ext = substr($basename, $pos);
+-        }
+-        else {
+-          $name = $basename;
+-          $ext = '';
+-        }
+-
+-        $counter = 0;
+-        do {
+-          $destination = $directory . $separator . $name . '_' . $counter++ . $ext;
+-        } while ($wrapper->filesystem->fileExists($destination));
+-
+-      }
+-    }
+-    catch (\Exception $e) {
+-      \Drupal::logger('FlyStreamWrapper')->error('Exception: ' . $e->getMessage());
+-      // @todo write exception handler to handle Flysystem Exception, and
+-      // return a proper return code, which is FALSE.
+-    }
+-    return $destination;
+-  }
+-
+-  /**
+-   * FileSystem::getDestinationFilename() to FilesystemOperator methods.
+-   *
+-   * @param \Drupal\flysystem\FlyStream\FlyStreamWrapperInterface $wrapper
+-   *   Drupal StreamWrapper service.
+-   * @param string $basename
+-   *   The base file name, calculated.
+-   * @param string $destination
+-   *   The desired final URI or filepath.
+-   * @param \Drupal\Core\File\FileExists|int $fileExists
+-   *   Replace behavior when the destination file already exists.
+-   *
+-   * @return string|bool
+-   *   The destination filepath, or FALSE if the file already exists
+-   *   and FileExists::Error is specified.
+-   *
+-   * @todo finish writing, see inline todo comments.
+-   */
+-  protected function getDestinationFilenameFs($wrapper, $basename, $destination, $fileExists): string|bool {
+-    \Drupal::logger('flysystem')->notice('Calling ' . __METHOD__ . ', basename: ' . $basename . ', destination: ' . $destination);
+-    try {
+-      if ($wrapper->filesystem->fileExists($destination)) {
+-        switch ($fileExists) {
+-          case FileExists::Replace:
+-            // Do nothing here, we want to overwrite the existing file.
+-            break;
+-
+-          case FileExists::Rename:
+-            // Hmm, we are using the original Drupal FileSystem::dirname()
+-            // method here, will it error out?  Do we actually need to call
+-            // this?
+-            $directory = $this->dirname($destination);
+-            $destination = $this->createFilename($basename, $directory);
+-            break;
+-
+-          case FileExists::Error:
+-            // Error reporting handled by calling function.
+-            return FALSE;
+-        }
+-      }
+-    }
+-    catch (\Exception $e) {
+-      \Drupal::logger('FlyStreamWrapper')->error('Exception: ' . $e->getMessage());
+-      // @todo write exception handler to handle Flysystem Exception, and
+-      // return a proper return code, which is FALSE.
+-    }
+-    return $destination;
+-  }
+-
+-}
+diff --git a/src/Event/EnsureEvent.php b/src/Event/EnsureEvent.php
+new file mode 100644
+index 0000000..56b646e
+--- /dev/null
++++ b/src/Event/EnsureEvent.php
+@@ -0,0 +1,99 @@
++<?php
++
++namespace Drupal\flysystem\Event;
++
++use Drupal\Component\EventDispatcher\Event;
++
++/**
++ * The event fired for every result from an ensure() call.
++ */
++class EnsureEvent extends Event {
++
++  /**
++   * The log context.
++   *
++   * @var array
++   */
++  protected $context;
++
++  /**
++   * The log message.
++   *
++   * @var string
++   */
++  protected $message;
++
++  /**
++   * The scheme of the item being logged.
++   *
++   * @var string
++   */
++  protected $scheme;
++
++  /**
++   * The severity of the message being logged.
++   *
++   * @var int
++   */
++  protected $severity;
++
++  /**
++   * Constructs an EnsureEvent object.
++   *
++   * @param string $scheme
++   *   The scheme.
++   * @param int $severity
++   *   The severity.
++   * @param string $message
++   *   The message.
++   * @param array $context
++   *   The context for the message.
++   */
++  public function __construct($scheme, $severity, $message, array $context) {
++    $this->scheme = $scheme;
++    $this->severity = $severity;
++    $this->message = $message;
++    $this->context = $context;
++  }
++
++  /**
++   * Returns the context.
++   *
++   * @return array
++   *   Context.
++   */
++  public function getContext() {
++    return $this->context;
++  }
++
++  /**
++   * Returns the message.
++   *
++   * @return string
++   *   The message text.
++   */
++  public function getMessage() {
++    return $this->message;
++  }
++
++  /**
++   * Returns the scheme.
++   *
++   * @return string
++   *   The scheme identifier.
++   */
++  public function getScheme() {
++    return $this->scheme;
++  }
++
++  /**
++   * Returns the severity.
++   *
++   * @return int
++   *   The severity.
++   */
++  public function getSeverity() {
++    return $this->severity;
++  }
++
++}
+diff --git a/src/Event/FlysystemEvents.php b/src/Event/FlysystemEvents.php
+new file mode 100644
+index 0000000..f21fc6a
+--- /dev/null
++++ b/src/Event/FlysystemEvents.php
+@@ -0,0 +1,15 @@
++<?php
++
++namespace Drupal\flysystem\Event;
++
++/**
++ * Defines events for the Flysystem module.
++ */
++final class FlysystemEvents {
++
++  /**
++   * Fired when FlysystemFactory::ensure() is called.
++   */
++  const ENSURE = 'feeds.ensure';
++
++}
+diff --git a/src/EventSubscriber/EnsureSubscriber.php b/src/EventSubscriber/EnsureSubscriber.php
+new file mode 100644
+index 0000000..aef0402
+--- /dev/null
++++ b/src/EventSubscriber/EnsureSubscriber.php
+@@ -0,0 +1,63 @@
++<?php
++
++namespace Drupal\flysystem\EventSubscriber;
++
++use Drupal\Core\Logger\RfcLogLevel;
++use Drupal\flysystem\Event\EnsureEvent;
++use Drupal\flysystem\Event\FlysystemEvents;
++use Psr\Log\LoggerInterface;
++use Symfony\Component\EventDispatcher\EventSubscriberInterface;
++use Symfony\Contracts\EventDispatcher\EventDispatcherInterface;
++
++/**
++ * Event listener that listens to Flysystem ensure() calls.
++ */
++class EnsureSubscriber implements EventSubscriberInterface {
++
++  /**
++   * The logger to use.
++   *
++   * @var \Psr\Log\LoggerInterface
++   */
++  protected $logger;
++
++  /**
++   * {@inheritdoc}
++   */
++  public static function getSubscribedEvents(): array {
++    $events = [];
++
++    $events[FlysystemEvents::ENSURE][] = 'onEnsure';
++
++    return $events;
++  }
++
++  /**
++   * Constructs an EnsureSubscriber object.
++   *
++   * @param \Psr\Log\LoggerInterface $logger
++   *   The logger.
++   */
++  public function __construct(LoggerInterface $logger) {
++    $this->logger = $logger;
++  }
++
++  /**
++   * Responds to FlysystemFactory::ensure().
++   */
++  public function onEnsure(EnsureEvent $event, $event_name, EventDispatcherInterface $dispatcher) {
++    // We only want to log failures, since this runs frequently.
++    switch ($event->getSeverity()) {
++      case RfcLogLevel::NOTICE:
++      case RfcLogLevel::INFO:
++        return;
++    }
++
++    $this->logger->log(
++      $event->getSeverity(),
++      $event->getMessage(),
++      $event->getContext()
++    );
++  }
++
++}
+diff --git a/src/FlyStream/Exception/CouldNotDeleteFileException.php b/src/FlyStream/Exception/CouldNotDeleteFileException.php
+deleted file mode 100644
+index f180ef5..0000000
+--- a/src/FlyStream/Exception/CouldNotDeleteFileException.php
++++ /dev/null
+@@ -1,11 +0,0 @@
+-<?php
+-
+-namespace Drupal\flysystem\FlyStream\Exception;
+-
+-/**
+- * Exception handler when File Could Not be Deleted.
+- */
+-class CouldNotDeleteFileException extends StreamWrapperException {
+-  protected const ERROR_MESSAGE = 'Could not delete file';
+-
+-}
+diff --git a/src/FlyStream/Exception/CouldNotRemoveDirectoryException.php b/src/FlyStream/Exception/CouldNotRemoveDirectoryException.php
+deleted file mode 100644
+index 6b7c8b3..0000000
+--- a/src/FlyStream/Exception/CouldNotRemoveDirectoryException.php
++++ /dev/null
+@@ -1,11 +0,0 @@
+-<?php
+-
+-namespace Drupal\flysystem\FlyStream\Exception;
+-
+-/**
+- * Exception handler when Directory Could Not be Removed.
+- */
+-class CouldNotRemoveDirectoryException extends StreamWrapperException {
+-  protected const ERROR_MESSAGE = 'Could not remove directory';
+-
+-}
+diff --git a/src/FlyStream/Exception/DirectoryExistsException.php b/src/FlyStream/Exception/DirectoryExistsException.php
+deleted file mode 100644
+index 1e36c46..0000000
+--- a/src/FlyStream/Exception/DirectoryExistsException.php
++++ /dev/null
+@@ -1,11 +0,0 @@
+-<?php
+-
+-namespace Drupal\flysystem\FlyStream\Exception;
+-
+-/**
+- * Exception handler when Directory exists.
+- */
+-class DirectoryExistsException extends StreamWrapperException {
+-  protected const ERROR_MESSAGE = 'Directory exists';
+-
+-}
+diff --git a/src/FlyStream/Exception/DirectoryNotEmptyException.php b/src/FlyStream/Exception/DirectoryNotEmptyException.php
+deleted file mode 100644
+index 383f5e3..0000000
+--- a/src/FlyStream/Exception/DirectoryNotEmptyException.php
++++ /dev/null
+@@ -1,11 +0,0 @@
+-<?php
+-
+-namespace Drupal\flysystem\FlyStream\Exception;
+-
+-/**
+- * Exception handler when Directory is Not Empty.
+- */
+-class DirectoryNotEmptyException extends StreamWrapperException {
+-  protected const ERROR_MESSAGE = 'Directory not empty';
+-
+-}
+diff --git a/src/FlyStream/Exception/DirectoryNotFoundException.php b/src/FlyStream/Exception/DirectoryNotFoundException.php
+deleted file mode 100644
+index 74c1c6e..0000000
+--- a/src/FlyStream/Exception/DirectoryNotFoundException.php
++++ /dev/null
+@@ -1,11 +0,0 @@
+-<?php
+-
+-namespace Drupal\flysystem\FlyStream\Exception;
+-
+-/**
+- * Exception handler when Directory is not found.
+- */
+-class DirectoryNotFoundException extends StreamWrapperException {
+-  protected const ERROR_MESSAGE = 'Failed to open dir';
+-
+-}
+diff --git a/src/FlyStream/Exception/FileNotFoundException.php b/src/FlyStream/Exception/FileNotFoundException.php
+deleted file mode 100644
+index e36d1d1..0000000
+--- a/src/FlyStream/Exception/FileNotFoundException.php
++++ /dev/null
+@@ -1,11 +0,0 @@
+-<?php
+-
+-namespace Drupal\flysystem\FlyStream\Exception;
+-
+-/**
+- * Exception handler when File is Not Found.
+- */
+-class FileNotFoundException extends StreamWrapperException {
+-  protected const ERROR_MESSAGE = 'No such file or directory';
+-
+-}
+diff --git a/src/FlyStream/Exception/InvalidStreamModeException.php b/src/FlyStream/Exception/InvalidStreamModeException.php
+deleted file mode 100644
+index 5f3c2a4..0000000
+--- a/src/FlyStream/Exception/InvalidStreamModeException.php
++++ /dev/null
+@@ -1,40 +0,0 @@
+-<?php
+-
+-namespace Drupal\flysystem\FlyStream\Exception;
+-
+-use League\Flysystem\FilesystemException;
+-
+-/**
+- * Exception handler when stream mode is not valid.
+- */
+-class InvalidStreamModeException extends \RuntimeException implements FilesystemException {
+-
+-  /**
+-   * Returns meta information for exception.
+-   *
+-   * @param string $command
+-   *   Command triggering exception.
+-   * @param string $location
+-   *   Code location where exception was triggered.
+-   * @param string $mode
+-   *   File / Directory mode.
+-   * @param \Throwable $previous
+-   *   Previous exception.
+-   *
+-   * @return \Drupal\flysystem\FlyStream\Exception\InvalidStreamModeException
+-   *   Exception thrown.
+-   */
+-  public static function atLocation(
+-    string $command,
+-    string $location,
+-    string $mode,
+-    \Throwable $previous = NULL,
+-  ): InvalidStreamModeException {
+-    return new self(
+-      "$command($location): Failed to open stream: '$mode' is not a valid mode",
+-      0,
+-      $previous
+-    );
+-  }
+-
+-}
+diff --git a/src/FlyStream/Exception/IsDirectoryException.php b/src/FlyStream/Exception/IsDirectoryException.php
+deleted file mode 100644
+index e397c4f..0000000
+--- a/src/FlyStream/Exception/IsDirectoryException.php
++++ /dev/null
+@@ -1,11 +0,0 @@
+-<?php
+-
+-namespace Drupal\flysystem\FlyStream\Exception;
+-
+-/**
+- * Exception handler when File is Not Found.
+- */
+-class IsDirectoryException extends StreamWrapperException {
+-  protected const ERROR_MESSAGE = 'Is a directory';
+-
+-}
+diff --git a/src/FlyStream/Exception/IsNotDirectoryException.php b/src/FlyStream/Exception/IsNotDirectoryException.php
+deleted file mode 100644
+index e8dfdf9..0000000
+--- a/src/FlyStream/Exception/IsNotDirectoryException.php
++++ /dev/null
+@@ -1,11 +0,0 @@
+-<?php
+-
+-namespace Drupal\flysystem\FlyStream\Exception;
+-
+-/**
+- * Exception handler when File is Not Found.
+- */
+-class IsNotDirectoryException extends StreamWrapperException {
+-  protected const ERROR_MESSAGE = 'Not a directory';
+-
+-}
+diff --git a/src/FlyStream/Exception/RootDirectoryException.php b/src/FlyStream/Exception/RootDirectoryException.php
+deleted file mode 100644
+index 687884f..0000000
+--- a/src/FlyStream/Exception/RootDirectoryException.php
++++ /dev/null
+@@ -1,11 +0,0 @@
+-<?php
+-
+-namespace Drupal\flysystem\FlyStream\Exception;
+-
+-/**
+- * Exception handler when Directory is the root directory.
+- */
+-class RootDirectoryException extends StreamWrapperException {
+-  protected const ERROR_MESSAGE = 'Directory is root';
+-
+-}
+diff --git a/src/FlyStream/Exception/StatFailedException.php b/src/FlyStream/Exception/StatFailedException.php
+deleted file mode 100644
+index 5235778..0000000
+--- a/src/FlyStream/Exception/StatFailedException.php
++++ /dev/null
+@@ -1,11 +0,0 @@
+-<?php
+-
+-namespace Drupal\flysystem\FlyStream\Exception;
+-
+-/**
+- * Exception handler when Directory is the root directory.
+- */
+-class StatFailedException extends StreamWrapperException {
+-  protected const ERROR_MESSAGE = 'Stat failed';
+-
+-}
+diff --git a/src/FlyStream/Exception/StreamWrapperException.php b/src/FlyStream/Exception/StreamWrapperException.php
+deleted file mode 100644
+index cd59eeb..0000000
+--- a/src/FlyStream/Exception/StreamWrapperException.php
++++ /dev/null
+@@ -1,34 +0,0 @@
+-<?php
+-
+-namespace Drupal\flysystem\FlyStream\Exception;
+-
+-use League\Flysystem\FilesystemException;
+-
+-/**
+- * StreamWrapper exception handler.
+- */
+-class StreamWrapperException extends \RuntimeException implements FilesystemException {
+-  protected const ERROR_MESSAGE = 'Error message not defined';
+-
+-  /**
+-   * Returns meta information for exception.
+-   *
+-   * @param string $command
+-   *   Command triggering exception.
+-   * @param string $location
+-   *   Code location where exception was triggered.
+-   * @param \Throwable $previous
+-   *   Previous exception.
+-   *
+-   * @return \Drupal\flysystem\FlyStream\Exception\StreamWrapperException
+-   *   Exception thrown.
+-   */
+-  public static function atLocation(
+-    string $command,
+-    string $location,
+-    \Throwable $previous = NULL,
+-  ): StreamWrapperException {
+-    return new self("$command($location): " . static::ERROR_MESSAGE, 0, $previous);
+-  }
+-
+-}
+diff --git a/src/FlyStream/Exception/UnableToChangePermissionsException.php b/src/FlyStream/Exception/UnableToChangePermissionsException.php
+deleted file mode 100644
+index 7417e9e..0000000
+--- a/src/FlyStream/Exception/UnableToChangePermissionsException.php
++++ /dev/null
+@@ -1,36 +0,0 @@
+-<?php
+-
+-namespace Drupal\flysystem\FlyStream\Exception;
+-
+-use League\Flysystem\FilesystemException;
+-
+-/**
+- * Exception handler when Unable to change permissions.
+- */
+-class UnableToChangePermissionsException extends \RuntimeException implements FilesystemException {
+-
+-  /**
+-   * Returns meta information for exception.
+-   *
+-   * @param string $command
+-   *   Command triggering exception.
+-   * @param string $location
+-   *   Code location where exception was triggered.
+-   * @param string $permission
+-   *   File / Directory permission.
+-   * @param \Throwable $previous
+-   *   Previous exception.
+-   *
+-   * @return \Drupal\flysystem\FlyStream\Exception\UnableToChangePermissionsException
+-   *   Exception thrown.
+-   */
+-  public static function atLocation(
+-    string $command,
+-    string $location,
+-    string $permission,
+-    \Throwable $previous = NULL,
+-  ): UnableToChangePermissionsException {
+-    return new self("$command($location,$permission): Unable to change permissions", 0, $previous);
+-  }
+-
+-}
+diff --git a/src/FlyStream/Exception/UnableToCreateDirectoryException.php b/src/FlyStream/Exception/UnableToCreateDirectoryException.php
+deleted file mode 100644
+index fda17a6..0000000
+--- a/src/FlyStream/Exception/UnableToCreateDirectoryException.php
++++ /dev/null
+@@ -1,11 +0,0 @@
+-<?php
+-
+-namespace Drupal\flysystem\FlyStream\Exception;
+-
+-/**
+- * Exception handler when Directory cannot be created.
+- */
+-class UnableToCreateDirectoryException extends StreamWrapperException {
+-  protected const ERROR_MESSAGE = 'Cannot create directory';
+-
+-}
+diff --git a/src/FlyStream/Exception/UnableToReadException.php b/src/FlyStream/Exception/UnableToReadException.php
+deleted file mode 100644
+index 3403b6a..0000000
+--- a/src/FlyStream/Exception/UnableToReadException.php
++++ /dev/null
+@@ -1,11 +0,0 @@
+-<?php
+-
+-namespace Drupal\flysystem\FlyStream\Exception;
+-
+-/**
+- * Exception handler when Unable to Read file.
+- */
+-class UnableToReadException extends StreamWrapperException {
+-  protected const ERROR_MESSAGE = 'Unable to read file';
+-
+-}
+diff --git a/src/FlyStream/Exception/UnableToWriteException.php b/src/FlyStream/Exception/UnableToWriteException.php
+deleted file mode 100644
+index b112edd..0000000
+--- a/src/FlyStream/Exception/UnableToWriteException.php
++++ /dev/null
+@@ -1,11 +0,0 @@
+-<?php
+-
+-namespace Drupal\flysystem\FlyStream\Exception;
+-
+-/**
+- * Exception handler when Unable to Write to file.
+- */
+-class UnableToWriteException extends StreamWrapperException {
+-  protected const ERROR_MESSAGE = 'Unable to write to file';
+-
+-}
+diff --git a/src/FlyStream/ExceptionHandlerTrait.php b/src/FlyStream/ExceptionHandlerTrait.php
+deleted file mode 100644
+index 8e080c7..0000000
+--- a/src/FlyStream/ExceptionHandlerTrait.php
++++ /dev/null
+@@ -1,46 +0,0 @@
+-<?php
+-
+-namespace Drupal\flysystem\FlyStream;
+-
+-use League\Flysystem\FilesystemException;
+-
+-/**
+- * ExceptionHandler trait for Stream Wrappers.
+- */
+-trait ExceptionHandlerTrait {
+-
+-  /**
+-   * Triggers error handler.
+-   *
+-   * @param \League\Flysystem\FilesystemException $e
+-   *   FilesystemException thrown by FilesystemOperator.
+-   *
+-   * @return bool
+-   *   Returns a FALSE value after triggering error.
+-   */
+-  protected function triggerError(FilesystemException $e): bool {
+-    trigger_error($this->collectErrorMessage($e), E_USER_WARNING);
+-
+-    return FALSE;
+-  }
+-
+-  /**
+-   * Collects the information abou the error message thrown in the exception.
+-   *
+-   * @param \Throwable $e
+-   *   Throwable exception.
+-   *
+-   * @return string
+-   *   Error message to return to handler.
+-   */
+-  protected function collectErrorMessage(\Throwable $e): string {
+-    $message = $e->getMessage();
+-    $previous = $e->getPrevious();
+-    if (!$previous instanceof \Throwable) {
+-      return $message;
+-    }
+-
+-    return $message . ' : ' . $this->collectErrorMessage($previous);
+-  }
+-
+-}
+diff --git a/src/FlyStream/FlyStreamWrapper.php b/src/FlyStream/FlyStreamWrapper.php
+deleted file mode 100644
+index 4f618a8..0000000
+--- a/src/FlyStream/FlyStreamWrapper.php
++++ /dev/null
+@@ -1,98 +0,0 @@
+-<?php
+-
+-namespace Drupal\flysystem\FlyStream;
+-
+-use Drupal\Core\StreamWrapper\StreamWrapperInterface;
+-use Drupal\Core\StringTranslation\StringTranslationTrait;
+-
+-/**
+- * FlyStream Stram Wrapper implementation.
+- */
+-class FlyStreamWrapper extends FlyStreamWrapperBase implements FlyStreamWrapperInterface, StreamWrapperInterface {
+-
+-  use StringTranslationTrait;
+-
+-  /**
+-   * Instance URI (stream).
+-   *
+-   * A stream is referenced as "scheme://target".
+-   *
+-   * @var string
+-   */
+-  protected $uri;
+-
+-  /**
+-   * StreamWrapper type.
+-   *
+-   * @var int
+-   */
+-  protected static $type = StreamWrapperInterface::NORMAL;
+-
+-  /**
+-   * {@inheritdoc}
+-   */
+-  public static function getType() {
+-    return self::$type;
+-  }
+-
+-  /**
+-   * {@inheritdoc}
+-   */
+-  public function getName() {
+-    return $this->t("Flysystem Stream Wrapper: @scheme", ['@scheme' => $this->scheme]);
+-  }
+-
+-  /**
+-   * {@inheritdoc}
+-   */
+-  public function getDescription() {
+-    return $this->t("Flysystem Stream Wrapper: @scheme", ['@scheme' => $this->scheme]);
+-  }
+-
+-  /**
+-   * {@inheritdoc}
+-   */
+-  public function getExternalUrl() {
+-    return $this->uri;
+-  }
+-
+-  /**
+-   * {@inheritdoc}
+-   */
+-  public function setUri($uri) {
+-    $this->uri = $uri;
+-  }
+-
+-  /**
+-   * {@inheritdoc}
+-   */
+-  public function getUri() {
+-    return $this->uri;
+-  }
+-
+-  /**
+-   * {@inheritdoc}
+-   */
+-  public function realpath() {
+-    return '';
+-  }
+-
+-  /**
+-   * {@inheritdoc}
+-   */
+-  public function dirname($uri = NULL): string {
+-    if (!isset($uri)) {
+-      $uri = $this->uri;
+-    }
+-
+-    [$scheme, $target] = explode('://', $uri, 2);
+-    $dirname = dirname($target);
+-
+-    if ($dirname == '.') {
+-      $dirname = '';
+-    }
+-
+-    return $scheme . '://' . $dirname;
+-  }
+-
+-}
+diff --git a/src/FlyStream/FlyStreamWrapperBase.php b/src/FlyStream/FlyStreamWrapperBase.php
+deleted file mode 100644
+index d652465..0000000
+--- a/src/FlyStream/FlyStreamWrapperBase.php
++++ /dev/null
+@@ -1,1075 +0,0 @@
+-<?php
+-
+-namespace Drupal\flysystem\FlyStream;
+-
+-use Drupal\Core\Config\CachedStorage;
+-use Drupal\Core\StreamWrapper\PhpStreamWrapperInterface;
+-use Drupal\flysystem\FlyStream\Exception\CouldNotDeleteFileException;
+-use Drupal\flysystem\FlyStream\Exception\CouldNotRemoveDirectoryException;
+-use Drupal\flysystem\FlyStream\Exception\DirectoryExistsException;
+-use Drupal\flysystem\FlyStream\Exception\DirectoryNotEmptyException;
+-use Drupal\flysystem\FlyStream\Exception\DirectoryNotFoundException;
+-use Drupal\flysystem\FlyStream\Exception\FileNotFoundException;
+-use Drupal\flysystem\FlyStream\Exception\InvalidStreamModeException;
+-use Drupal\flysystem\FlyStream\Exception\IsDirectoryException;
+-use Drupal\flysystem\FlyStream\Exception\IsNotDirectoryException;
+-use Drupal\flysystem\FlyStream\Exception\RootDirectoryException;
+-use Drupal\flysystem\FlyStream\Exception\StatFailedException;
+-use Drupal\flysystem\FlyStream\Exception\UnableToChangePermissionsException;
+-use Drupal\flysystem\FlyStream\Exception\UnableToCreateDirectoryException;
+-use Drupal\flysystem\FlyStream\Exception\UnableToReadException;
+-use Drupal\flysystem\FlyStream\Exception\UnableToWriteException;
+-use League\Flysystem\Config;
+-use League\Flysystem\Filesystem;
+-use League\Flysystem\FilesystemException;
+-use League\Flysystem\StorageAttributes;
+-use League\Flysystem\UnableToRetrieveMetadata;
+-use League\Flysystem\UnixVisibility\PortableVisibilityConverter;
+-use League\Flysystem\Visibility;
+-use League\Flysystem\WhitespacePathNormalizer;
+-use Symfony\Component\Lock\Key;
+-use Symfony\Component\Lock\Lock;
+-use Symfony\Component\Lock\Store\StoreFactory;
+-
+-/**
+- * FlyStreamWrapper class, stream wrapper base for Flysystem Drupal module.
+- */
+-class FlyStreamWrapperBase implements PhpStreamWrapperInterface, FlyStreamWrapperInterface {
+-
+-  use ExceptionHandlerTrait;
+-
+-  /**
+-   * Config Storage service.
+-   *
+-   * @var \Drupal\Core\Config\CachedStorage
+-   */
+-  protected $configStorage;
+-  /**
+-   * Configuration file name.
+-   *
+-   * @var string|null
+-   */
+-  protected $configuration;
+-
+-  /**
+-   * File permission mode.
+-   *
+-   * @var string|null
+-   */
+-  protected $mode = NULL;
+-
+-  /**
+-   * Directory listing.
+-   *
+-   * @var \Iterator|\IteratorAggregate|\Traversable|null
+-   */
+-  protected $dir = NULL;
+-
+-  /**
+-   * Resource context.
+-   *
+-   * @var resource
+-   */
+-  public $context;
+-
+-  /**
+-   * Directory Listing contents.
+-   *
+-   * @var \Iterator<mixed,\League\Flysystem\StorageAttributes>
+-   */
+-  public $dirListing;
+-
+-  /**
+-   * File directory path.
+-   *
+-   * @var string
+-   */
+-  public $path;
+-
+-  /**
+-   * Wrapper scheme.
+-   *
+-   * @var string
+-   */
+-  protected $scheme;
+-
+-  /**
+-   * File path.
+-   *
+-   * @var string
+-   */
+-  public $file;
+-
+-  /**
+-   * Flysystem Filesystem instance.
+-   *
+-   * @var \League\Flysystem\FilesystemOperator
+-   */
+-  public $filesystem;
+-
+-  /**
+-   * Configuration data.
+-   *
+-   * @var array<string, int|string|bool|null>
+-   */
+-  public $config = [];
+-
+-  /**
+-   * Work on Local Copy setting.
+-   *
+-   * @var bool
+-   */
+-  public $workOnLocalCopy = FALSE;
+-
+-  /**
+-   * Bytes written to stream.
+-   *
+-   * @var int
+-   */
+-  public $bytesWritten = 0;
+-
+-  /**
+-   * Lock Key setting.
+-   *
+-   * @var \Symfony\Component\Lock\Key
+-   */
+-  public $lockKey;
+-
+-  /**
+-   * Write only setting.
+-   *
+-   * @var bool
+-   */
+-  public $writeOnly = FALSE;
+-
+-  /**
+-   * Always Append setting.
+-   *
+-   * @var bool
+-   */
+-  public $alwaysAppend = FALSE;
+-
+-  /**
+-   * Write Buffer Size.
+-   *
+-   * @var int
+-   */
+-  public $writeBufferSize = 0;
+-
+-  /**
+-   * Resource handle.
+-   *
+-   * @var resource|false
+-   */
+-  public $handle = FALSE;
+-
+-  /**
+-   * Adapter Factory options.
+-   *
+-   * @var array|null
+-   */
+-  public $options = NULL;
+-
+-  /**
+-   * Class constructor.
+-   *
+-   * @param string $configuration
+-   *   Name of configuration file for adapter.
+-   * @param \Drupal\Core\Config\CachedStorage $config_storage
+-   *   Config Storage service.
+-   */
+-  public function __construct(string $configuration, CachedStorage $config_storage) {
+-    \Drupal::logger('FlyStreamWrapper')->notice('Calling ' . __METHOD__);
+-    \Drupal::logger('FlyStreamWrapper')->notice('Configuration: ' . $configuration);
+-    \Drupal::logger('FlyStreamWrapper')->notice('config.storage ' . isset($config_storage));
+-
+-    $this->configuration = $configuration;
+-    $this->configStorage = $config_storage;
+-
+-    $config = $this->configStorage->read($configuration);
+-
+-    $adapterClass = new \ReflectionClass($config['sub_adapter_config']['plugin_adapter_class']);
+-
+-    $adapterFactory = $adapterClass->newInstance();
+-
+-    $adapterFactoryInstance = $adapterFactory::create($config['sub_adapter_config']);
+-
+-    $this->options = $adapterFactoryInstance['options'];
+-    $this->filesystem = new Filesystem($adapterFactoryInstance['adapter']);
+-
+-  }
+-
+-  // phpcs:disable Drupal.NamingConventions.ValidFunctionName.ScopeNotCamelCaps
+-
+-  /**
+-   * {@inheritdoc}
+-   *
+-   * @todo Done
+-   */
+-  public function dir_closedir(): bool {
+-    \Drupal::logger('FlyStreamWrapper')->notice('Calling ' . __METHOD__);
+-    unset($this->dirListing);
+-    return TRUE;
+-  }
+-
+-  /**
+-   * {@inheritdoc}
+-   *
+-   * @todo Done
+-   */
+-  public function dir_opendir($path, $options): bool {
+-    \Drupal::logger('FlyStreamWrapper')->notice('Calling ' . __METHOD__);
+-    $this->setPath($path);
+-    try {
+-      $listing = $this->filesystem->listContents($this->file)->getIterator();
+-      $this->dirListing = ($listing instanceof \Iterator) ? $listing : new \IteratorIterator($listing);
+-    }
+-    catch (FilesystemException $e) {
+-      return $this->triggerError(
+-        DirectoryNotFoundException::atLocation(__METHOD__, $path, $e)
+-      );
+-    }
+-
+-    $valid = @is_dir($path);
+-    if (!$valid) {
+-      return self::triggerError(
+-        DirectoryNotFoundException::atLocation(__METHOD__, $path)
+-      );
+-    }
+-
+-    return TRUE;
+-
+-  }
+-
+-  /**
+-   * {@inheritdoc}
+-   *
+-   * @todo Done
+-   */
+-  public function dir_readdir(): string|bool {
+-    \Drupal::logger('FlyStreamWrapper')->notice('Calling ' . __METHOD__);
+-    if (!$this->dirListing->valid()) {
+-      return FALSE;
+-    }
+-
+-    $item = $this->dirListing->current();
+-
+-    $this->dirListing->next();
+-
+-    return basename($item->path());
+-
+-  }
+-
+-  /**
+-   * {@inheritdoc}
+-   *
+-   * @todo Done
+-   */
+-  public function dir_rewinddir(): bool {
+-    \Drupal::logger('FlyStreamWrapper')->notice('Calling ' . __METHOD__);
+-    try {
+-      $listing = $this->filesystem->listContents($this->file)->getIterator();
+-      $this->dirListing = ($listing instanceof \Iterator) ? $listing : new \IteratorIterator($listing);
+-    }
+-    catch (FilesystemException $e) {
+-      return self::triggerError($e);
+-    }
+-
+-    return TRUE;
+-
+-  }
+-
+-  /**
+-   * {@inheritdoc}
+-   *
+-   * @todo Done
+-   */
+-  public function mkdir($path, $mode, $options): bool {
+-    \Drupal::logger('FlyStreamWrapper')->notice('Calling ' . __METHOD__);
+-    if (file_exists($path)) {
+-      return self::triggerError(DirectoryExistsException::atLocation(__METHOD__, $path));
+-    }
+-
+-    $this->setPath($path);
+-
+-    try {
+-      $visibility = new PortableVisibilityConverter();
+-      $config = [
+-        Config::OPTION_VISIBILITY => $visibility->inverseForDirectory($mode),
+-      ];
+-      $this->filesystem->createDirectory($this->file, $config);
+-
+-      return TRUE;
+-    }
+-    catch (FilesystemException $e) {
+-      return self::triggerError(
+-        UnableToCreateDirectoryException::atLocation(__METHOD__, $path, $e)
+-      );
+-    }
+-  }
+-
+-  /**
+-   * {@inheritdoc}
+-   *
+-   * @todo Done
+-   */
+-  public function rename($path_from, $path_to): bool {
+-    \Drupal::logger('FlyStreamWrapper')->notice('Calling ' . __METHOD__);
+-    $this->setPath($path_from);
+-    $errorLocation = $path_from . ',' . $path_to;
+-    if (!file_exists($path_from)) {
+-      return self::triggerError(FileNotFoundException::atLocation(__METHOD__, $errorLocation));
+-    }
+-
+-    if (file_exists($path_to)) {
+-      if (is_file($path_from) && is_dir($path_to)) {
+-        return self::triggerError(
+-          IsDirectoryException::atLocation(__METHOD__, $errorLocation)
+-        );
+-      }
+-      if (is_dir($path_from) && is_file($path_to)) {
+-        return self::triggerError(
+-          IsNotDirectoryException::atLocation(__METHOD__, $errorLocation)
+-        );
+-      }
+-    }
+-
+-    try {
+-      $this->filesystem->move($this->file, $this->getFile($path_to));
+-      return TRUE;
+-    }
+-    catch (FilesystemException $e) {
+-      return self::triggerError(
+-        DirectoryNotEmptyException::atLocation(__METHOD__, $errorLocation, $e)
+-      );
+-    }
+-  }
+-
+-  /**
+-   * {@inheritdoc}
+-   *
+-   * @todo Done
+-   */
+-  public function rmdir($path, $options): bool {
+-    \Drupal::logger('FlyStreamWrapper')->notice('Calling ' . __METHOD__);
+-    $this->setPath($path);
+-
+-    $n = new WhitespacePathNormalizer();
+-    $n->normalizePath($this->file);
+-    if ('' === $n->normalizePath($this->file)) {
+-      return self::triggerError(
+-        RootDirectoryException::atLocation(__METHOD__, $this->path)
+-      );
+-    }
+-
+-    if (($options & STREAM_MKDIR_RECURSIVE) !== 0) {
+-      try {
+-        $this->filesystem->deleteDirectory($this->file);
+-        return TRUE;
+-      }
+-      catch (FilesystemException $e) {
+-        return self::triggerError(
+-          CouldNotRemoveDirectoryException::atLocation(__METHOD__, $this->path, $e)
+-        );
+-      }
+-    }
+-
+-    try {
+-      $listing = $this->filesystem->listContents($this->file);
+-    }
+-    catch (FilesystemException $e) {
+-      return self::triggerError(
+-        DirectoryNotEmptyException::atLocation(__METHOD__, $this->path)
+-      );
+-    }
+-
+-    foreach ($listing as $ignored) {
+-      if (!$ignored instanceof StorageAttributes) {
+-        continue;
+-      }
+-
+-      return self::triggerError(
+-        DirectoryNotEmptyException::atLocation(__METHOD__, $this->path)
+-      );
+-    }
+-
+-    try {
+-      $this->filesystem->deleteDirectory($this->file);
+-      return TRUE;
+-    }
+-    catch (FilesystemException $e) {
+-      return self::triggerError(
+-        CouldNotRemoveDirectoryException::atLocation(__METHOD__, $this->path, $e)
+-      );
+-    }
+-  }
+-
+-  /**
+-   * {@inheritdoc}
+-   *
+-   * @todo Done
+-   */
+-  public function stream_cast($cast_as) {
+-    \Drupal::logger('FlyStreamWrapper')->notice('Calling ' . __METHOD__);
+-    return $this->handle;
+-  }
+-
+-  /**
+-   * {@inheritdoc}
+-   *
+-   * @todo Done
+-   */
+-  public function stream_close(): void {
+-    \Drupal::logger('FlyStreamWrapper')->notice('Calling ' . __METHOD__);
+-    if (!is_resource($this->handle)) {
+-      return;
+-    }
+-
+-    if ($this->workOnLocalCopy) {
+-      fflush($this->handle);
+-      rewind($this->handle);
+-
+-      try {
+-        $this->filesystem->writeStream($this->file, $this->handle);
+-      }
+-      catch (FilesystemException $e) {
+-        trigger_error(
+-          'stream_close(' . $this->path . ') Unable to sync file : ' . $e->getMessage(),
+-          E_USER_WARNING
+-        );
+-      }
+-    }
+-    fclose($this->handle);
+-  }
+-
+-  /**
+-   * {@inheritdoc}
+-   *
+-   * @todo Done
+-   */
+-  public function stream_eof(): bool {
+-    \Drupal::logger('FlyStreamWrapper')->notice('Calling ' . __METHOD__);
+-    if (!is_resource($this->handle)) {
+-      return FALSE;
+-    }
+-
+-    return feof($this->handle);
+-  }
+-
+-  /**
+-   * {@inheritdoc}
+-   *
+-   * @todo Done
+-   */
+-  public function stream_flush(): bool {
+-    \Drupal::logger('FlyStreamWrapper')->notice('Calling ' . __METHOD__);
+-    if (!is_resource($this->handle)) {
+-      trigger_error(
+-        'stream_flush(): Supplied resource is not a valid stream resource',
+-        E_USER_WARNING
+-      );
+-
+-      return FALSE;
+-    }
+-
+-    $success = fflush($this->handle);
+-
+-    if ($this->workOnLocalCopy) {
+-      fflush($this->handle);
+-      $currentPosition = ftell($this->handle);
+-      rewind($this->handle);
+-
+-      try {
+-        $this->filesystem->writeStream($this->file, $this->handle);
+-      }
+-      catch (FilesystemException $e) {
+-        trigger_error(
+-          'stream_flush(' . $this->path . ') Unable to sync file : ' . $e->getMessage(),
+-          E_USER_WARNING
+-        );
+-        $success = FALSE;
+-      }
+-
+-      if (FALSE !== $currentPosition) {
+-        if (is_resource($this->handle)) {
+-          fseek($this->handle, $currentPosition);
+-        }
+-      }
+-    }
+-
+-    $this->bytesWritten = 0;
+-
+-    return $success;
+-  }
+-
+-  /**
+-   * {@inheritdoc}
+-   *
+-   * @todo In progress
+-   */
+-  public function stream_lock($operation): bool {
+-    \Drupal::logger('FlyStreamWrapper')->notice('Calling ' . __METHOD__);
+-    if (NULL === $this->lockKey) {
+-      $this->lockKey = new Key($this->path);
+-    }
+-
+-    $store = StoreFactory::createStore((string) $this->config[FlyStreamWrapperInterface::LOCK_STORE]);
+-    $lock = new Lock(
+-      $this->lockKey,
+-      $store,
+-      (float) $this->config[FlyStreamWrapperInterface::LOCK_TTL],
+-      FALSE
+-    );
+-
+-    switch ($operation) {
+-      case LOCK_SH:
+-        return $lock->acquireRead(TRUE);
+-
+-      case LOCK_EX:
+-        return $lock->acquire(TRUE);
+-
+-      case LOCK_UN:
+-        $lock->release();
+-        return TRUE;
+-
+-      case LOCK_SH | LOCK_NB:
+-        return $lock->acquireRead();
+-
+-      case LOCK_EX | LOCK_NB:
+-        return $lock->acquire();
+-    }
+-
+-    return FALSE;
+-  }
+-
+-  /**
+-   * {@inheritdoc}
+-   *
+-   * @todo Done
+-   */
+-  public function stream_metadata($path, $option, $value): bool {
+-    \Drupal::logger('FlyStreamWrapper')->notice('Calling ' . __METHOD__);
+-    $this->setPath($path);
+-    $filesystem = $this->filesystem;
+-    $file = $this->file;
+-    $converter = $this->options['visibility'] ?? new PortableVisibilityConverter();
+-    switch ($option) {
+-      case STREAM_META_ACCESS:
+-        if (!is_int($value)) {
+-          $value = (int) $value;
+-        }
+-        $visibility = is_dir($path) ? $converter->inverseForDirectory($value) : $converter->inverseForFile($value);
+-
+-        try {
+-          $filesystem->setVisibility($file, $visibility);
+-        }
+-        catch (FilesystemException $e) {
+-          if (!$this->ignoreVisibilityErrors()) {
+-            return self::triggerError(UnableToChangePermissionsException::atLocation(
+-              __METHOD__,
+-              $this->path,
+-              decoct($value),
+-              $e
+-            ));
+-          }
+-        }
+-        return TRUE;
+-
+-      case STREAM_META_TOUCH:
+-        try {
+-          if (!$filesystem->fileExists($file)) {
+-            $filesystem->write($file, '');
+-          }
+-        }
+-        catch (FilesystemException $e) {
+-          return self::triggerError(UnableToWriteException::atLocation(
+-            __METHOD__,
+-            $this->path,
+-            $e
+-          ));
+-        }
+-
+-        return TRUE;
+-
+-      default:
+-        return FALSE;
+-    }
+-
+-  }
+-
+-  /**
+-   * {@inheritdoc}
+-   *
+-   * @todo Done
+-   */
+-  public function stream_open($path, $mode, $options, &$openedPath = NULL): bool {
+-    \Drupal::logger('FlyStreamWrapper')->notice('Calling ' . __METHOD__);
+-    $this->setPath($path);
+-    $filesystem = $this->filesystem;
+-    $file = $this->file;
+-
+-    if (!preg_match('/^[rwacx](\+b?|b\+?)?$/', $mode)) {
+-      return self::triggerError(InvalidStreamModeException::atLocation(
+-        __METHOD__,
+-        $this->path,
+-        $mode
+-      ));
+-    }
+-
+-    $this->writeOnly = !strpos($mode, '+');
+-    try {
+-      if ('r' === $mode[0] && $this->writeOnly) {
+-        $this->handle = $filesystem->readStream($file);
+-        $this->workOnLocalCopy = FALSE;
+-        $this->writeOnly = FALSE;
+-      }
+-      else {
+-        $this->handle = fopen('php://temp', 'w+b');
+-        $this->workOnLocalCopy = TRUE;
+-
+-        if ('w' !== $mode[0] && $filesystem->fileExists($file)) {
+-          if ('x' === $mode[0]) {
+-            throw UnableToWriteException::atLocation(__METHOD__, $this->path);
+-          }
+-
+-          $result = FALSE;
+-          if (is_resource($this->handle)) {
+-            $result = stream_copy_to_stream($filesystem->readStream($file), $this->handle);
+-          }
+-          if (!$result) {
+-            throw UnableToWriteException::atLocation(__METHOD__, $this->path);
+-          }
+-        }
+-      }
+-
+-      $this->alwaysAppend = 'a' === $mode[0];
+-      if (is_resource($this->handle) && !$this->alwaysAppend) {
+-        @rewind($this->handle);
+-      }
+-    }
+-    catch (FilesystemException $e) {
+-      if (($options & STREAM_REPORT_ERRORS) !== 0) {
+-        return self::triggerError(UnableToReadException::atLocation(
+-          __METHOD__,
+-          $this->path,
+-          $e
+-        ));
+-      }
+-      return FALSE;
+-    }
+-
+-    if ($this->handle && $options & STREAM_USE_PATH) {
+-      $openedPath = $path;
+-    }
+-
+-    if (is_resource($this->handle)) {
+-      return TRUE;
+-    }
+-
+-    if (($options & STREAM_REPORT_ERRORS) !== 0) {
+-      return self::triggerError(FileNotFoundException::atLocation(__METHOD__, $this->path));
+-    }
+-
+-    return FALSE;
+-  }
+-
+-  /**
+-   * {@inheritdoc}
+-   *
+-   * @todo DONE
+-   */
+-  public function stream_read($count): string {
+-    \Drupal::logger('FlyStreamWrapper')->notice('Calling ' . __METHOD__);
+-    if ($this->writeOnly || !is_resource($this->handle) || $count < 0) {
+-      return '';
+-    }
+-
+-    return (string) fread($this->handle, $count);
+-  }
+-
+-  /**
+-   * {@inheritdoc}
+-   */
+-  public function stream_seek($offset, $whence = SEEK_SET): bool {
+-    \Drupal::logger('FlyStreamWrapper')->notice('Calling ' . __METHOD__);
+-    if (!is_resource($this->handle)) {
+-      return FALSE;
+-    }
+-
+-    return 0 === fseek($this->handle, $offset, $whence);
+-  }
+-
+-  /**
+-   * {@inheritdoc}
+-   */
+-  public function stream_set_option($option, $arg1, $arg2 = NULL): bool {
+-    \Drupal::logger('FlyStreamWrapper')->notice('Calling ' . __METHOD__);
+-    if (!is_resource($this->handle)) {
+-      return FALSE;
+-    }
+-
+-    switch ($option) {
+-      case STREAM_OPTION_BLOCKING:
+-        return stream_set_blocking($this->handle, 1 === $arg1);
+-
+-      case STREAM_OPTION_READ_BUFFER:
+-        return 0 === stream_set_read_buffer(
+-          $this->handle,
+-            STREAM_BUFFER_NONE === $arg1 ? 0 : (int) $arg2
+-          );
+-
+-      case STREAM_OPTION_WRITE_BUFFER:
+-        $this->writeBufferSize = STREAM_BUFFER_NONE === $arg1 ? 0 : (int) $arg2;
+-
+-        return TRUE;
+-
+-      case STREAM_OPTION_READ_TIMEOUT:
+-        return stream_set_timeout($this->handle, $arg1, (int) $arg2);
+-    }
+-
+-    return FALSE;
+-  }
+-
+-  /**
+-   * {@inheritdoc}
+-   */
+-  public function stream_stat(): array|false {
+-    \Drupal::logger('FlyStreamWrapper')->notice('Calling ' . __METHOD__);
+-    try {
+-      return $this->getStat();
+-    }
+-    catch (FilesystemException $e) {
+-      self::triggerError(StatFailedException::atLocation(__METHOD__, $this->path, $e));
+-
+-      return FALSE;
+-    }
+-
+-  }
+-
+-  /**
+-   * {@inheritdoc}
+-   */
+-  public function stream_tell(): int {
+-    \Drupal::logger('FlyStreamWrapper')->notice('Calling ' . __METHOD__);
+-    if (!is_resource($this->handle)) {
+-      return 0;
+-    }
+-
+-    if ($this->alwaysAppend && $this->writeOnly) {
+-      return 0;
+-    }
+-
+-    return (int) ftell($this->handle);
+-  }
+-
+-  /**
+-   * {@inheritdoc}
+-   */
+-  public function stream_truncate($new_size): bool {
+-    \Drupal::logger('FlyStreamWrapper')->notice('Calling ' . __METHOD__);
+-    if (!is_resource($this->handle) || $new_size < 0) {
+-      return FALSE;
+-    }
+-
+-    return ftruncate($this->handle, $new_size);
+-  }
+-
+-  /**
+-   * {@inheritdoc}
+-   */
+-  public function stream_write($data): int|false {
+-    \Drupal::logger('FlyStreamWrapper')->notice('Calling ' . __METHOD__);
+-    if (!is_resource($this->handle)) {
+-      return 0;
+-    }
+-
+-    if ($this->alwaysAppend) {
+-      fseek($this->handle, 0, SEEK_END);
+-    }
+-
+-    $size = (int) fwrite($this->handle, $data);
+-    $this->bytesWritten += $size;
+-
+-    if ($this->alwaysAppend) {
+-      fseek($this->handle, 0, SEEK_SET);
+-    }
+-
+-    return $size;
+-  }
+-
+-  /**
+-   * {@inheritdoc}
+-   */
+-  public function unlink($path): bool {
+-    \Drupal::logger('FlyStreamWrapper')->notice('Calling ' . __METHOD__);
+-    $this->setPath($path);
+-
+-    if (!file_exists($this->path)) {
+-      return self::triggerError(FileNotFoundException::atLocation(__METHOD__, $this->path));
+-    }
+-
+-    try {
+-      $this->filesystem->delete($this->file);
+-      return TRUE;
+-    }
+-    catch (FilesystemException $e) {
+-      return self::triggerError(
+-        CouldNotDeleteFileException::atLocation(__METHOD__, $this->path, $e)
+-          );
+-    }
+-  }
+-
+-  /**
+-   * {@inheritdoc}
+-   */
+-  public function url_stat($path, $flags): array|false {
+-    \Drupal::logger('FlyStreamWrapper')->notice('Calling ' . __METHOD__);
+-    $this->setPath($path);
+-
+-    try {
+-      return $this->getStat();
+-    }
+-    catch (FilesystemException $e) {
+-      if (($flags & STREAM_URL_STAT_QUIET) !== 0) {
+-        return FALSE;
+-      }
+-
+-      self::triggerError(StatFailedException::atLocation(__METHOD__, $path, $e));
+-
+-      return FALSE;
+-    }
+-  }
+-
+-  // phpcs:enable
+-
+-  /**
+-   * Get file, directory, or resource stat.
+-   *
+-   * @return array<int|string,int|string>|false
+-   *   Requested stat, or FALSE if it doesn't exist.
+-   *
+-   * @throws \League\Flysystem\FilesystemException
+-   */
+-  protected function getStat() {
+-    \Drupal::logger('FlyStreamWrapper')->notice('Calling ' . __METHOD__);
+-    $stats = [];
+-
+-    if ($this->workOnLocalCopy && is_resource($this->handle)) {
+-      $stats = fstat($this->handle);
+-      if (!$stats) {
+-        return FALSE;
+-      }
+-      if ($this->filesystem->fileExists($this->file)) {
+-        [$mode, $size, $time] = $this->getRemoteStats();
+-
+-        unset($size);
+-      }
+-    }
+-    else {
+-      [$mode, $size, $time] = $this->getRemoteStats();
+-    }
+-
+-    foreach (self::STATS_ZERO as $key) {
+-      $stats[$key] = 0;
+-    }
+-
+-    foreach (self::STATS_MINUS_ONE as $key) {
+-      $stats[$key] = -1;
+-    }
+-
+-    if (isset($mode)) {
+-      foreach (self::STATS_MODE as $key) {
+-        $stats[$key] = $mode;
+-      }
+-    }
+-
+-    if (isset($size)) {
+-      foreach (self::STATS_SIZE as $key) {
+-        $stats[$key] = $size;
+-      }
+-    }
+-
+-    if (isset($time)) {
+-      foreach (self::STATS_TIME as $key) {
+-        $stats[$key] = $time;
+-      }
+-    }
+-
+-    $stats['uid'] = $stats[4] = (int) $this->config[FlyStreamWrapperInterface::UID];
+-    $stats['gid'] = $stats[5] = (int) $this->config[FlyStreamWrapperInterface::GID];
+-
+-    return $stats;
+-  }
+-
+-  /**
+-   * Gets stats from remote resource.
+-   *
+-   * @throws \League\Flysystem\FilesystemException
+-   *
+-   * @return array<int,int>
+-   *   Requested stats.
+-   */
+-  protected function getRemoteStats(): array {
+-    \Drupal::logger('FlyStreamWrapper')->notice('Calling ' . __METHOD__);
+-    $newConverter = new PortableVisibilityConverter(
+-      (int) $this->config[FlyStreamWrapperInterface::VISIBILITY_FILE_PUBLIC],
+-      (int) $this->config[FlyStreamWrapperInterface::VISIBILITY_FILE_PRIVATE],
+-      (int) $this->config[FlyStreamWrapperInterface::VISIBILITY_DIRECTORY_PUBLIC],
+-      (int) $this->config[FlyStreamWrapperInterface::VISIBILITY_DIRECTORY_PRIVATE],
+-      (string) $this->config[FlyStreamWrapperInterface::VISIBILITY_DEFAULT_FOR_DIRECTORIES]
+-    );
+-
+-    $converter = $this->options['visibility'] ?? $newConverter;
+-    try {
+-      $visibility = $this->filesystem->visibility($this->file);
+-    }
+-    catch (UnableToRetrieveMetadata | \TypeError $e) {
+-      if (!$this->ignoreVisibilityErrors()) {
+-        throw $e;
+-      }
+-
+-      $visibility = Visibility::PUBLIC;
+-    }
+-
+-    $mode = 0;
+-    $size = 0;
+-    $lastModified = 0;
+-
+-    try {
+-      if ('directory' === $this->filesystem->mimeType($this->file)) {
+-        [$mode, $size, $lastModified] = $this->getRemoteDirectoryStats($converter, $visibility);
+-      }
+-      else {
+-        [$mode, $size, $lastModified] = $this->getRemoteFileStats($converter, $visibility);
+-      }
+-    }
+-    catch (UnableToRetrieveMetadata $e) {
+-      if (method_exists($this->filesystem, 'directoryExists')) {
+-        if ($this->filesystem->directoryExists($this->file)) {
+-          [$mode, $size, $lastModified] = $this->getRemoteDirectoryStats($converter, $visibility);
+-        }
+-        elseif ($this->filesystem->fileExists($this->file)) {
+-          [$mode, $size, $lastModified] = $this->getRemoteFileStats($converter, $visibility);
+-        }
+-      }
+-      else {
+-        throw $e;
+-      }
+-    }
+-
+-    return [$mode, $size, $lastModified];
+-  }
+-
+-  /**
+-   * Get stats for Remote Directory.
+-   *
+-   * @return array<int, int>
+-   *   Requested stats.
+-   *
+-   * @throws \League\Flysystem\FilesystemException
+-   */
+-  private function getRemoteDirectoryStats(
+-    PortableVisibilityConverter $converter,
+-    string $visibility,
+-  ): array {
+-    \Drupal::logger('FlyStreamWrapper')->notice('Calling ' . __METHOD__);
+-    $mode = 040000 + $converter->forDirectory($visibility);
+-    $size = 0;
+-    $lastModified = $this->getRemoteDirectoryLastModified();
+-    return [$mode, $size, $lastModified];
+-  }
+-
+-  /**
+-   * Get stats for remote file.
+-   *
+-   * @return array<int, int>
+-   *   Requested stats.
+-   *
+-   * @throws \League\Flysystem\FilesystemException
+-   */
+-  private function getRemoteFileStats(
+-    PortableVisibilityConverter $converter,
+-    string $visibility,
+-  ): array {
+-    \Drupal::logger('FlyStreamWrapper')->notice('Calling ' . __METHOD__);
+-    $mode = 0100000 + $converter->forFile($visibility);
+-    $size = $this->filesystem->fileSize($this->file);
+-    $lastModified = $this->filesystem->lastModified($this->file);
+-    return [$mode, $size, $lastModified];
+-  }
+-
+-  /**
+-   * Gets Last Modified stat for remote directory.
+-   *
+-   * @return int
+-   *   Last modified stat.
+-   *
+-   * @throws \League\Flysystem\FilesystemException
+-   */
+-  private function getRemoteDirectoryLastModified(): int {
+-    \Drupal::logger('FlyStreamWrapper')->notice('Calling ' . __METHOD__);
+-    if (!$this->emulateDirectoryLastModified()) {
+-      return $this->filesystem->lastModified($this->file);
+-    }
+-
+-    $lastModified = 0;
+-    $listing = $this->filesystem->listContents($this->file)->getIterator();
+-    $dirListing = $listing instanceof \Iterator ? $listing : new \IteratorIterator($listing);
+-
+-    /** @var \League\Flysystem\FileAttributes $item */
+-    foreach ($dirListing as $item) {
+-      $lastModified = max($lastModified, $item->lastModified());
+-    }
+-    return $lastModified;
+-  }
+-
+-  /**
+-   * Get the file path.
+-   *
+-   * @param string $path
+-   *   File path.
+-   *
+-   * @return string
+-   *   File path converted.
+-   */
+-  private function getFile(string $path): string {
+-    \Drupal::logger('FlyStreamWrapper')->notice('Calling ' . __METHOD__);
+-    return (string) substr($path, strpos($path, '://') + 3);
+-  }
+-
+-  /**
+-   * Configures settings based on path.
+-   *
+-   * @param string $path
+-   *   File path.
+-   */
+-  private function setPath(string $path): void {
+-    $this->path = $path;
+-    $this->scheme = substr($path, 0, (int) strpos($path, '://'));
+-    $this->file = $this->getFile($path);
+-  }
+-
+-  /**
+-   * Gets Emulate Directory Last Modified settings.
+-   *
+-   * @return bool
+-   *   Boolean setting.
+-   */
+-  private function emulateDirectoryLastModified(): bool {
+-    \Drupal::logger('FlyStreamWrapper')->notice('Calling ' . __METHOD__);
+-    // @refactor??
+-    return (bool) $this->config[FlyStreamWrapper::EMULATE_DIRECTORY_LAST_MODIFIED];
+-  }
+-
+-  /**
+-   * Gets Ignore Visibility Errors settings.
+-   *
+-   * @return bool
+-   *   Boolean setting.
+-   */
+-  private function ignoreVisibilityErrors(): bool {
+-    \Drupal::logger('FlyStreamWrapper')->notice('Calling ' . __METHOD__);
+-    return (bool) $this->config[FlyStreamWrapper::IGNORE_VISIBILITY_ERRORS];
+-  }
+-
+-}
+diff --git a/src/FlyStream/FlyStreamWrapperInterface.php b/src/FlyStream/FlyStreamWrapperInterface.php
+deleted file mode 100644
+index 0b45566..0000000
+--- a/src/FlyStream/FlyStreamWrapperInterface.php
++++ /dev/null
+@@ -1,53 +0,0 @@
+-<?php
+-
+-namespace Drupal\flysystem\FlyStream;
+-
+-use League\Flysystem\Visibility;
+-
+-/**
+- * Interface for FlyStream stream wrappers.
+- */
+-interface FlyStreamWrapperInterface {
+-
+-  public const LOCK_STORE = 'lock_store';
+-  public const LOCK_TTL = 'lock_ttl';
+-
+-  public const IGNORE_VISIBILITY_ERRORS = 'ignore_visibility_errors';
+-
+-  public const EMULATE_DIRECTORY_LAST_MODIFIED = 'emulate_directory_last_modified';
+-
+-  public const UID = 'uid';
+-  public const GID = 'gid';
+-
+-  public const VISIBILITY_FILE_PUBLIC = 'visibility_file_public';
+-  public const VISIBILITY_FILE_PRIVATE = 'visibility_file_private';
+-  public const VISIBILITY_DIRECTORY_PUBLIC = 'visibility_directory_public';
+-  public const VISIBILITY_DIRECTORY_PRIVATE = 'visibility_directory_private';
+-  public const VISIBILITY_DEFAULT_FOR_DIRECTORIES = 'visibility_default_for_directories';
+-
+-  public const DEFAULT_CONFIGURATION = [
+-    // Const LOCK_STORE.
+-    self::LOCK_STORE => 'flock:///tmp',
+-    // Const LOCK_TTL.
+-    self::LOCK_TTL => 300,
+-    // Const IGNORE_VISIBILITY_ERRORS.
+-    self::IGNORE_VISIBILITY_ERRORS => FALSE,
+-    self::EMULATE_DIRECTORY_LAST_MODIFIED => FALSE,
+-
+-    self::UID => NULL,
+-    self::GID => NULL,
+-
+-    self::VISIBILITY_FILE_PUBLIC => 0644,
+-    self::VISIBILITY_FILE_PRIVATE => 0600,
+-    self::VISIBILITY_DIRECTORY_PUBLIC => 0755,
+-    self::VISIBILITY_DIRECTORY_PRIVATE => 0700,
+-    self::VISIBILITY_DEFAULT_FOR_DIRECTORIES => Visibility::PRIVATE,
+-  ];
+-
+-  public const STATS_ZERO = [0, 'dev', 1, 'ino', 3, 'nlink', 6, 'rdev'];
+-  public const STATS_MODE = [2, 'mode'];
+-  public const STATS_SIZE = [7, 'size'];
+-  public const STATS_TIME = [8, 'atime', 9, 'mtime', 10, 'ctime'];
+-  public const STATS_MINUS_ONE = [11, 'blksize', 12, 'blocks'];
+-
+-}
+diff --git a/src/FlysystemServiceProvider.php b/src/FlysystemServiceProvider.php
+index aef4626..e9980c5 100644
+--- a/src/FlysystemServiceProvider.php
++++ b/src/FlysystemServiceProvider.php
+@@ -3,43 +3,36 @@
+ namespace Drupal\flysystem;
+ 
+ use Drupal\Core\DependencyInjection\ContainerBuilder;
+-use Drupal\Core\DependencyInjection\ServiceProviderBase;
+-use Symfony\Component\DependencyInjection\Reference;
+-use Symfony\Component\DependencyInjection\ContainerInterface;
++use Drupal\Core\DependencyInjection\ServiceProviderInterface;
++use Drupal\Core\Site\Settings;
+ 
+ /**
+- * Registers Flysystem Stream Wrappers.
+- *
+- * Registers stream wrappers using the configured Flysystem adapters.
++ * Flysystem dependency injection container.
+  */
+-class FlysystemServiceProvider extends ServiceProviderBase {
++class FlysystemServiceProvider implements ServiceProviderInterface {
+ 
+   /**
+    * {@inheritdoc}
+    */
+-  public function register(ContainerBuilder $container): void {
++  public function register(ContainerBuilder $container) {
+ 
+-    /** @var \Drupal\Core\Config\DatabaseStorage $config_storage */
+-    $config_storage = $container->get('config.storage.active');
+-    $entity_config_names = $config_storage->listAll('flysystem.flysystem_adapter_config');
++    foreach (Settings::get('flysystem', []) as $scheme => $settings) {
+ 
+-    if (!empty($entity_config_names)) {
+-      $configured_entities = $config_storage->readMultiple($entity_config_names);
++      // Just some sanity checking, so things don't explode.
++      if (empty($settings['driver'])) {
++        continue;
++      }
+ 
+-      foreach ($configured_entities as $key => $value) {
+-        if (empty($value)) {
+-          // This should never happen, however if it does skip this entry.
+-          continue;
+-        }
++      $container
++        ->register('flysystem_stream_wrapper.' . $scheme, 'Drupal\flysystem\FlysystemBridge')
++        ->addTag('stream_wrapper', ['scheme' => $scheme]);
+ 
+-        if ($value['status'] !== TRUE) {
+-          // Scheme is not enabled.
+-          continue;
+-        }
++      // Register the path processors for local files.
++      if ($settings['driver'] === 'local' && !empty($settings['config']['public'])) {
+         $container
+-          ->register('stream_wrapper.' . $value['id'], 'Drupal\flysystem\FlyStream\FlyStreamWrapper')
+-          ->addTag('stream_wrapper', ['scheme' => $value['id']])
+-          ->setArguments([$key, new Reference('config.storage')]);
++          ->register('flysystem.' . $scheme . '.path_processor', 'Drupal\flysystem\PathProcessor\LocalPathProcessor')
++          ->addTag('path_processor_inbound', ['priority' => 400])
++          ->addArgument($scheme);
+       }
+     }
+   }
+diff --git a/src/PathProcessor/FlysystemImageStyleRedirectProcessor.php b/src/PathProcessor/FlysystemImageStyleRedirectProcessor.php
+new file mode 100644
+index 0000000..51a06c9
+--- /dev/null
++++ b/src/PathProcessor/FlysystemImageStyleRedirectProcessor.php
+@@ -0,0 +1,47 @@
++<?php
++
++namespace Drupal\flysystem\PathProcessor;
++
++use Drupal\Core\PathProcessor\InboundPathProcessorInterface;
++use Symfony\Component\HttpFoundation\Request;
++
++/**
++ * Defines a path processor to rewrite Flysystem URLs.
++ *
++ * As the route system does not allow arbitrary amount of parameters convert
++ * the file path to a query parameter on the request.
++ */
++class FlysystemImageStyleRedirectProcessor implements InboundPathProcessorInterface {
++
++  /**
++   * The base menu path for style redirects.
++   */
++  const STYLES_PATH = '/_flysystem-style-redirect';
++
++  /**
++   * {@inheritdoc}
++   */
++  public function processInbound($path, Request $request) {
++    // Quick exit.
++    if (strpos($path, static::STYLES_PATH . '/') !== 0) {
++      return $path;
++    }
++
++    // Stream wrapper protocols must conform to /^[a-zA-Z0-9+.-]+$/
++    // Via php_stream_wrapper_scheme_validate() in the PHP source.
++    $matches = [];
++    if (!preg_match('|^' . static::STYLES_PATH . '/([^/]+)/([a-zA-Z0-9+.-]+)/|', $path, $matches)) {
++      return $path;
++    }
++
++    $file = substr($path, strlen($matches[0]));
++    $image_style = $matches[1];
++    $scheme = $matches[2];
++
++    // Set the file as query parameter.
++    $request->query->set('file', $file);
++
++    return static::STYLES_PATH . '/' . $image_style . '/' . $scheme . '/' . hash('sha256', $file);
++  }
++
++}
+diff --git a/src/PathProcessor/FlysystemPathProcessor.php b/src/PathProcessor/FlysystemPathProcessor.php
+new file mode 100644
+index 0000000..29c8a9b
+--- /dev/null
++++ b/src/PathProcessor/FlysystemPathProcessor.php
+@@ -0,0 +1,49 @@
++<?php
++
++namespace Drupal\flysystem\PathProcessor;
++
++use Drupal\Core\PathProcessor\InboundPathProcessorInterface;
++use Symfony\Component\HttpFoundation\Request;
++
++/**
++ * Defines a path processor to rewrite Flysystem URLs.
++ *
++ * As the route system does not allow arbitrary amount of parameters convert
++ * the file path to a query parameter on the request.
++ */
++class FlysystemPathProcessor implements InboundPathProcessorInterface {
++
++  /**
++   * {@inheritdoc}
++   */
++  public function processInbound($path, Request $request) {
++    // Quick exit.
++    if (strpos($path, '/_flysystem/') !== 0) {
++      return $path;
++    }
++
++    // Stream wrapper protocols must conform to /^[a-zA-Z0-9+.-]+$/
++    // Via php_stream_wrapper_scheme_validate() in the PHP source.
++    if (!preg_match('|^/_flysystem/([a-zA-Z0-9+.-]+)/|', $path, $matches)) {
++      return $path;
++    }
++
++    $rest = substr($path, strlen($matches[0]));
++
++    // Support image styles.
++    if (strpos($rest, 'styles/') === 0 && substr_count($rest, '/') >= 3) {
++      [, $image_style, $scheme, $file] = explode('/', $rest, 4);
++
++      // Set the file as query parameter.
++      $request->query->set('file', $file);
++
++      return '/_flysystem/styles/' . $image_style . '/' . $scheme;
++    }
++
++    // Routes to FileDownloadController::download().
++    $request->query->set('file', $rest);
++
++    return '/_flysystem/' . $matches[1];
++  }
++
++}
+diff --git a/src/PathProcessor/LocalPathProcessor.php b/src/PathProcessor/LocalPathProcessor.php
+new file mode 100644
+index 0000000..7019cae
+--- /dev/null
++++ b/src/PathProcessor/LocalPathProcessor.php
+@@ -0,0 +1,71 @@
++<?php
++
++namespace Drupal\flysystem\PathProcessor;
++
++use Drupal\Core\PathProcessor\InboundPathProcessorInterface;
++use Drupal\Core\Site\Settings;
++use Symfony\Component\HttpFoundation\Request;
++
++/**
++ * Defines a path processor to serve public files for the local adapter.
++ *
++ * As the route system does not allow arbitrary amount of parameters convert
++ * the file path to a query parameter on the request.
++ */
++class LocalPathProcessor implements InboundPathProcessorInterface {
++
++  /**
++   * The root of the local filesystem.
++   *
++   * @var string
++   */
++  protected $root;
++
++  /**
++   * The scheme.
++   *
++   * @var string
++   */
++  protected $scheme;
++
++  /**
++   * Constructs a LocalPathProcessor.
++   *
++   * @param string $scheme
++   *   The public scheme.
++   */
++  public function __construct($scheme) {
++    $this->scheme = $scheme;
++    $settings = Settings::get('flysystem', []);
++    $this->root = $settings[$scheme]['config']['root'];
++  }
++
++  /**
++   * {@inheritdoc}
++   */
++  public function processInbound($path, Request $request) {
++    if (strpos($path, '/' . $this->root . '/') !== 0) {
++      return $path;
++    }
++
++    $rest = substr($path, strlen($this->root) + 2);
++
++    if (preg_match('#^(js|css)/#', $rest)) {
++      return $path;
++    }
++
++    if (strpos($rest, 'styles/') === 0 && substr_count($rest, '/') >= 3) {
++      [, $image_style, $scheme, $file] = explode('/', $rest, 4);
++
++      // Set the file as query parameter.
++      $request->query->set('file', $file);
++
++      return '/' . $this->root . '/styles/' . $image_style . '/' . $scheme;
++    }
++
++    $request->query->set('file', $rest);
++
++    return '/' . $this->root;
++  }
++
++}
