@@ -120,8 +120,7 @@
                 "Fixing php 8.2 compatibility issues with php-compatibility-sniffer":"patches/php-compatibility-sniffer-8.1-patch.patch"
             },
             "drupal/flysystem": {
-                "Backport 2.3.x code to 3.0.x branch": "patches/pull-2.3.x-code-to-3.0.x-branch.patch",
-                "Comment out path processors": "patches/comment-out-path-processors.patch"
+                "Backport 2.3.x code to 3.0.x branch": "patches/pull-2.3.x-code-to-3.0.x-branch.patch"
             }
         },
         "drupal-lenient": {
