@@ -12278,17 +12278,16 @@ index 0000000..b5a9697
 +  - flysystem:flysystem
 diff --git a/modules/flysystem_test/flysystem_test.install b/modules/flysystem_test/flysystem_test.install
 new file mode 100644
-index 0000000..11e8d4b
+index 0000000..99348f6
 --- /dev/null
 +++ b/modules/flysystem_test/flysystem_test.install
-@@ -0,0 +1,19 @@
+@@ -0,0 +1,18 @@
 +<?php
 +
 +/**
 + * @file
 + * Install, update and uninstall functions for the flysystem_test module.
 + */
-+
 +
 +/**
 + * Implements hook_install().
