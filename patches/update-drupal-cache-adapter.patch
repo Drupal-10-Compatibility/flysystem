@@ -1,0 +1,472 @@
+diff --git a/src/Flysystem/Adapter/DrupalCacheAdapter.php b/src/Flysystem/Adapter/DrupalCacheAdapter.php
+index f8647de..142bec0 100644
+--- a/src/Flysystem/Adapter/DrupalCacheAdapter.php
++++ b/src/Flysystem/Adapter/DrupalCacheAdapter.php
+@@ -4,6 +4,9 @@ namespace Drupal\flysystem\Flysystem\Adapter;
+ 
+ use League\Flysystem\FilesystemAdapter;
+ use League\Flysystem\Config;
++use League\Flysystem\FileAttributes;
++use League\Flysystem\UnableToRetrieveMetadata;
++use League\Flysystem\UnableToCheckExistence;
+ 
+ /**
+  * A Flysystem adapter implementing caching with Drupal's Cache API.
+@@ -40,6 +43,9 @@ class DrupalCacheAdapter implements FilesystemAdapter {
+    *   The flysystem adapter to cache data for.
+    * @param \Drupal\flysystem\Flysystem\Adapter\CacheItemBackend $cacheItemBackend
+    *   The cache backend to store data in.
++   *
++   * @todo Evaluate whether the FilesystemAdapter should actuallly be the Filesystem instead.
++   * @see https://github.com/thephpleague/flysystem/blob/3.x/src/Filesystem.php
+    */
+   public function __construct($scheme, FilesystemAdapter $adapter, CacheItemBackend $cacheItemBackend) {
+     $this->scheme = $scheme;
+@@ -50,129 +56,206 @@ class DrupalCacheAdapter implements FilesystemAdapter {
+   /**
+    * {@inheritdoc}
+    */
+-  public function write($path, $contents, Config $config): array|false {
+-    $metadata = $this->adapter->write($path, $contents, $config);
+-
+-    return $this->updateMetadata($path, $metadata);
++  public function write(string $path, string $contents, Config $config): void {
++    try {
++      $this->adapter->write($path, $contents, $config);
++      // @todo See ::updateMetadata for additional refactoring on
++      // updating metadata for caching.
++      $this->updateMetadata($path);
++    }
++    catch (FilesystemException $exception) {
++      // @todo Log exception to logs,need to implement logger
++      // @todo Display user friendly error message
++      // @todo The following exception throw is temporary
++      throw new \Exception('File could not be saved.');
++    }
+   }
+ 
+   /**
+    * {@inheritdoc}
+    */
+-  public function writeStream($path, $resource, Config $config): array|false {
+-    $metadata = $this->adapter->writeStream($path, $resource, $config);
+-
+-    return $this->updateMetadata($path, $metadata);
++  public function writeStream($path, $resource, Config $config): void {
++    // @todo See ::write for additional refactoring notes.
++    try {
++      $this->adapter->writeStream($path, $resource, $config);
++      $this->updateMetadata($path);
++    }
++    catch (FilesystemException $exception) {
++      // @todo Log exception to logs,need to implement logger
++      // @todo Display user friendly error message
++      // @todo The following exception throw is temporary
++      throw new \Exception('Stream resource could not be saved.');
++    }
+   }
+ 
+   /**
+-   * {@inheritdoc}
++   * This method was deprecated for Flysystem v3.
++   *
++   * Leaving here for now for backwards compatibility, will need to refactor to
++   * replace calls to update / updateStream before finalizing an alpha release
++   * of v3.0.x.
++   *
++   * Also, since it has been deprecated, making this a protected function.
++   *
++   * @todo Refactor module to remove calls to ::update() before alpha release.
+    */
+-  public function update($path, $contents, Config $config): array|false {
+-    $metadata = $this->adapter->update($path, $contents, $config);
+-
+-    return $this->updateMetadata($path, $metadata);
++  protected function update($path, $contents, Config $config): void {
++    $this->write($path, $contents, $config);
+   }
+ 
+   /**
+-   * {@inheritdoc}
++   * This method was deprecated for Flysystem v3.
++   *
++   * @todo see ::update() for notes on refactoring.
+    */
+-  public function updateStream($path, $resource, Config $config): array|false {
+-    $metadata = $this->adapter->updateStream($path, $resource, $config);
+-
+-    return $this->updateMetadata($path, $metadata);
++  public function updateStream($path, $resource, Config $config): void {
++    $this->writeStream($path, $resource, $config);
+   }
+ 
+   /**
+    * {@inheritdoc}
+    */
+-  public function rename($path, $newPath): bool {
+-    $result = $this->adapter->rename($path, $newPath);
+-
+-    if ($result) {
++  public function move($path, $newPath, $config): void {
++    // @todo See ::write for additional refactoring notes.
++    try {
++      $this->adapter->move($path, $newPath, $config);
+       $item = $this->cacheItemBackend->load($path);
+       $newItem = clone $item;
+       $this->cacheItemBackend->set($newPath, $newItem);
+-      $this->cacheItemBackend->delete($path);
+     }
+-
+-    return $result;
++    catch (FilesystemException $exception) {
++      // @todo Log exception to logs,need to implement logger
++      // @todo Display user friendly error message
++      // @todo The following exception throw is temporary
++      throw new \Exception('File could not be moved.');
++    }
+   }
+ 
+   /**
+    * {@inheritdoc}
+    */
+-  public function copy($path, $newPath): bool {
+-    $result = $this->adapter->copy($path, $newPath);
+-
+-    if ($result) {
++  public function copy($path, $newPath, $config): void {
++    // @todo See ::write for additional refactoring notes.
++    try {
++      $this->adapter->copy($path, $newPath, $config);
+       $item = $this->cacheItemBackend->load($path);
+       $newItem = clone $item;
+       $this->cacheItemBackend->set($newPath, $newItem);
+     }
+-
+-    return $result;
++    catch (FilesystemException $exception) {
++      // @todo Log exception to logs,need to implement logger
++      // @todo Display user friendly error message
++      // @todo The following exception throw is temporary
++      throw new \Exception('File could not be copied.');
++    }
+   }
+ 
+   /**
+    * {@inheritdoc}
+    */
+-  public function delete($path): bool {
+-    $result = $this->adapter->delete($path);
+-
+-    if ($result) {
++  public function delete($path): void {
++    try {
++      $this->adapter->delete($path);
+       $this->cacheItemBackend->delete($path);
++      // It is ok!
++    }
++    catch (FilesystemException $exception) {
++      throw new \Exception('File could not be deleted.');
+     }
+-
+-    return $result;
+   }
+ 
+   /**
+    * {@inheritdoc}
+    */
+-  public function deleteDir($dirname): bool {
+-    // Before the delete we need to know what files are in the directory.
+-    $contents = $this->adapter->listContents($dirname, TRUE);
+-
+-    $result = $this->adapter->deleteDir($dirname);
+-
+-    if ($result) {
++  public function deleteDirectory($dirname): void {
++    try {
++      // Before the delete we need to know what files are in the directory.
++      // Necessary to be able to delete them from the cache backend.
++      $contents = $this->adapter->listContents($dirname, TRUE);
++      $this->adapter->deleteDirectory($dirname);
+       $paths = array_column($contents, 'path');
+       $this->cacheItemBackend->deleteMultiple($paths);
+     }
+-
+-    return $result;
++    catch (FilesystemException $exception) {
++      throw new \Exception('Directory could not be deleted.');
++    }
+   }
+ 
+   /**
+    * {@inheritdoc}
+    */
+-  public function createDir($dirname, Config $config): array|false {
+-    $metadata = $this->adapter->createDir($dirname, $config);
+-
+-    // Warm the metadata cache.
+-    if ($metadata) {
++  public function createDirectory($dirname, Config $config): void {
++    try {
++      $this->adapter->createDirectory($dirname, $config);
+       $item = new CacheItem();
+-      $item->updateMetadata($metadata);
++      $item->updateMetadata($item);
+       $this->cacheItemBackend->set($dirname, $item);
+     }
++    catch (FilesystemException $exception) {
++      throw new \Exception('Directory could not be created.');
++    }
+ 
+-    return $metadata;
+   }
+ 
+   /**
+    * {@inheritdoc}
+    */
+-  public function setVisibility($path, $visibility): array|false {
+-    $metadata = $this->adapter->setVisibility($path, $visibility);
++  public function setVisibility($path, $visibility): void {
++    try {
++      $this->adapter->setVisibility($path, $visibility);
++      $this->updateMetadata($path);
++    }
++    catch (FilesystemException $exception) {
++      // @todo Log exception to logs,need to implement logger
++      // @todo Display user friendly error message
++      // @todo The following exception throw is temporary
++      throw new \Exception('File / Resource visibility could not be set.');
++    }
++  }
+ 
+-    return $this->updateMetadata($path, $metadata);
++  /**
++   * {@inheritdoc}
++   */
++  public function fileExists($path): bool {
++    try {
++      $this->adapter->fileExists($path);
++    }
++    catch (UnableToCheckExistence $exception) {
++      // @todo Log exception to logs,need to implement logger
++      // @todo Display user friendly error message
++      // @todo The following exception throw is temporary
++      throw new \Exception('Checking for file existence failed.');
++    }
+   }
+ 
+   /**
+    * {@inheritdoc}
+    */
+-  public function has($path): array|bool|null {
++  public function directoryExists($path): bool {
++    try {
++      $this->adapter->directoryExists($path);
++    }
++    catch (UnableToCheckExistence $exception) {
++      // @todo Log exception to logs,need to implement logger
++      // @todo Display user friendly error message
++      // @todo The following exception throw is temporary
++      throw new \Exception('Checking for directory existence failed.');
++    }
++  }
++
++  /**
++   * This has been deprecated at the Adapter level for Flysystem v3.
++   *
++   * We may not need this at all, or we may want to refactor to implement
++   * the Filesystem instead of the adapter at this level, since that will
++   * make Drupal Caching more universal across all adapters.
++   *
++   * @todo Reconsider implementation and possibly refactor to use Filesystem.
++   */
++  public function has($path): bool {
++    // @todo This may not be needed, here, as ::has() no longer exists on the
++    // adapter, it exists on the (League/Flysystem) Filesystem object.
++    // Another case for using the Filesystem object instead of the adapter.
+     if ($this->cacheItemBackend->has($path)) {
+       return TRUE;
+     }
+@@ -185,15 +268,31 @@ class DrupalCacheAdapter implements FilesystemAdapter {
+   /**
+    * {@inheritdoc}
+    */
+-  public function read($path): array|false {
+-    return $this->adapter->read($path);
++  public function read(string $path): string {
++    try {
++      return $this->adapter->read($path);
++    }
++    catch (FilesystemException $exception) {
++      // @todo Log exception to logs,need to implement logger
++      // @todo Display user friendly error message
++      // @todo The following exception throw is temporary
++      throw new \Exception('File could not be read.');
++    }
+   }
+ 
+   /**
+    * {@inheritdoc}
+    */
+-  public function readStream($path): array|false {
+-    return $this->adapter->readStream($path);
++  public function readStream($path) {
++    try {
++      return $this->adapter->readStream($path);
++    }
++    catch (FilesystemException $exception) {
++      // @todo Log exception to logs,need to implement logger
++      // @todo Display user friendly error message
++      // @todo The following exception throw is temporary
++      throw new \Exception('Resource could not be read.');
++    }
+   }
+ 
+   /**
+@@ -209,90 +308,91 @@ class DrupalCacheAdapter implements FilesystemAdapter {
+   /**
+    * {@inheritdoc}
+    */
+-  public function getMetadata($path): array|false {
+-    $item = $this->cacheItemBackend->load($path);
+-
+-    if ($metadata = $item->getMetadata()) {
+-      return $metadata;
++  public function fileSize($path): FileAttributes {
++    try {
++      return $this->adapter->fileSize();
++    }
++    catch (UnableToRetrieveMetadata $exception) {
++      // @todo Log exception to logs,need to implement logger
++      // @todo Display user friendly error message
++      // @todo The following exception throw is temporary
++      throw new \Exception('File Size could not be retrieved.');
+     }
+-
+-    $metadata = $this->adapter->getMetadata($path);
+-    $item->updateMetadata($metadata);
+-    $this->cacheItemBackend->set($path, $item);
+-
+-    return $metadata;
+-  }
+-
+-  /**
+-   * {@inheritdoc}
+-   */
+-  public function getSize($path): array|false {
+-    return $this->fetchMetadataKey($path, 'size');
+   }
+ 
+   /**
+    * {@inheritdoc}
+    */
+-  public function getMimetype($path): array|false {
+-    return $this->fetchMetadataKey($path, 'mimetype');
++  public function mimeType($path): FileAttributes {
++    try {
++      return $this->adapter->mimeType($path);
++    }
++    catch (UnableToRetrieveMetadata $exception) {
++      // @todo Log exception to logs,need to implement logger
++      // @todo Display user friendly error message
++      // @todo The following exception throw is temporary
++      throw new \Exception('Mime type could not be retrieved.');
++    }
+   }
+ 
+   /**
+    * {@inheritdoc}
+    */
+-  public function getTimestamp($path): array|false {
+-    return $this->fetchMetadataKey($path, 'timestamp');
++  public function lastModified($path): FileAttributes {
++    try {
++      return $this->adapter->lastModified($path);
++    }
++    catch (UnableToRetrieveMetadata $exception) {
++      // @todo Log exception to logs,need to implement logger
++      // @todo Display user friendly error message
++      // @todo The following exception throw is temporary
++      throw new \Exception('Timestamp could not be retrieved.');
++    }
+   }
+ 
+   /**
+    * {@inheritdoc}
+    */
+-  public function getVisibility($path): array|false {
+-    return $this->fetchMetadataKey($path, 'visibility');
+-  }
+-
+-  /**
+-   * Fetches a specific key from metadata.
+-   *
+-   * @param string $path
+-   *   The path to load metadata for.
+-   * @param string $key
+-   *   The key in metadata, such as 'mimetype', to load metadata for.
+-   *
+-   * @return array
+-   *   The array of metadata.
+-   */
+-  protected function fetchMetadataKey($path, $key) {
+-    $item = $this->cacheItemBackend->load($path);
+-
+-    if (($metadata = $item->getMetadata()) && isset($metadata[$key])) {
+-      return $metadata;
++  public function visibility($path): FileAttributes {
++    try {
++      return $this->visibility($path);
++    }
++    catch (UnableToRetrieveMetadata $exception) {
++      // @todo Log exception to logs,need to implement logger
++      // @todo Display user friendly error message
++      // @todo The following exception throw is temporary
++      throw new \Exception('Visibility could not be retrieved.');
+     }
+-
+-    $method = 'get' . ucfirst($key);
+-
+-    return $this->updateMetadata($path, $this->adapter->$method($path));
+   }
+ 
+   /**
+    * Updates the metadata for a given path.
+    *
+    * @param string $path
+-   *   The path of file file or directory.
+-   * @param array|false $metadata
+-   *   The metadata to update.
+-   *
+-   * @return array|false
+-   *   Returns the value passed in as metadata.
++   *   The path of file or directory.
+    */
+-  protected function updateMetadata($path, $metadata) {
++  protected function updateMetadata($path): void {
++    // Note:  The following changes are based on Flysystem 3.x version of
++    // the local adapter, this will need to be revieweed for relevancy for
++    // all adapters to determine if this is the best overall approach.
++    // @todo review code from here to end for relevance with all adapters.
++    $entity = new FileAttributes($path);
++
++    $metadata = [
++      // FileAttributes object.
++      'type' => $entity->type(),
++      'path' => $path,
++      'timestamp' => $this->adapter->lastModified($path),
++    ];
++    if ($metadata['type'] == 'file') {
++      $metadata['size'] = $this->adapter->fileSize($path);
++    }
++
+     if (!empty($metadata)) {
+       $item = $this->cacheItemBackend->load($path);
+-      $item->updateMetadata($metadata);
++      $item->updateMetadata($path);
+       $this->cacheItemBackend->set($path, $item);
+     }
+-
+-    return $metadata;
+   }
+ 
+ }
