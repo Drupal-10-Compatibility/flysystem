@@ -15718,7 +15718,7 @@ index 0000000..da12e1c
 +}
 diff --git a/src/Flysystem/Adapter/DrupalCacheAdapter.php b/src/Flysystem/Adapter/DrupalCacheAdapter.php
 new file mode 100644
-index 0000000..63ce0db
+index 0000000..f8647de
 --- /dev/null
 +++ b/src/Flysystem/Adapter/DrupalCacheAdapter.php
 @@ -0,0 +1,298 @@
@@ -15726,18 +15726,18 @@ index 0000000..63ce0db
 +
 +namespace Drupal\flysystem\Flysystem\Adapter;
 +
-+use League\Flysystem\AdapterInterface;
++use League\Flysystem\FilesystemAdapter;
 +use League\Flysystem\Config;
 +
 +/**
 + * A Flysystem adapter implementing caching with Drupal's Cache API.
 + */
-+class DrupalCacheAdapter implements AdapterInterface {
++class DrupalCacheAdapter implements FilesystemAdapter {
 +
 +  /**
 +   * The Flysystem adapter to cache data for.
 +   *
-+   * @var \League\Flysystem\AdapterInterface
++   * @var \League\Flysystem\FilesystemAdapter
 +   */
 +  protected $adapter;
 +
@@ -15760,12 +15760,12 @@ index 0000000..63ce0db
 +   *
 +   * @param string $scheme
 +   *   The scheme of the stream wrapper used for this adapter.
-+   * @param \League\Flysystem\AdapterInterface $adapter
++   * @param \League\Flysystem\FilesystemAdapter $adapter
 +   *   The flysystem adapter to cache data for.
 +   * @param \Drupal\flysystem\Flysystem\Adapter\CacheItemBackend $cacheItemBackend
 +   *   The cache backend to store data in.
 +   */
-+  public function __construct($scheme, AdapterInterface $adapter, CacheItemBackend $cacheItemBackend) {
++  public function __construct($scheme, FilesystemAdapter $adapter, CacheItemBackend $cacheItemBackend) {
 +    $this->scheme = $scheme;
 +    $this->adapter = $adapter;
 +    $this->cacheItemBackend = $cacheItemBackend;
@@ -16022,7 +16022,7 @@ index 0000000..63ce0db
 +}
 diff --git a/src/Flysystem/Adapter/MissingAdapter.php b/src/Flysystem/Adapter/MissingAdapter.php
 new file mode 100644
-index 0000000..a006b3b
+index 0000000..b601870
 --- /dev/null
 +++ b/src/Flysystem/Adapter/MissingAdapter.php
 @@ -0,0 +1,146 @@
@@ -16030,13 +16030,13 @@ index 0000000..a006b3b
 +
 +namespace Drupal\flysystem\Flysystem\Adapter;
 +
-+use League\Flysystem\AdapterInterface;
++use League\Flysystem\FilesystemAdapter;
 +use League\Flysystem\Config;
 +
 +/**
 + * An adapter used when a plugin is missing. It fails at everything.
 + */
-+class MissingAdapter implements AdapterInterface {
++class MissingAdapter implements FilesystemAdapter {
 +
 +  /**
 +   * {@inheritdoc}
@@ -16513,6 +16513,19 @@ index 0000000..d2ea885
 +  }
 +
 +}
+diff --git a/src/FlysystemAdapterConfigInterface.php b/src/FlysystemAdapterConfigInterface.php
+index 43b12e4..7ea8e85 100644
+--- a/src/FlysystemAdapterConfigInterface.php
++++ b/src/FlysystemAdapterConfigInterface.php
+@@ -22,7 +22,7 @@ interface FlysystemAdapterConfigInterface extends ConfigEntityInterface {
+   /**
+    * Retrieves the Flysystem adapter.
+    *
+-   * @return \Drupal\flysystem\FlysystemAdapterInterface
++   * @return \League\Flysystem\FilesystemAdapter
+    *   This adapter config entity's Flysystem adapter.
+    *
+    * @throws \Drupal\flysystem\FlysystemException
 diff --git a/src/FlysystemBridge.php b/src/FlysystemBridge.php
 new file mode 100644
 index 0000000..04cfe85
@@ -16660,7 +16673,7 @@ index 0000000..04cfe85
 +}
 diff --git a/src/FlysystemFactory.php b/src/FlysystemFactory.php
 new file mode 100644
-index 0000000..e387ca9
+index 0000000..420d9ff
 --- /dev/null
 +++ b/src/FlysystemFactory.php
 @@ -0,0 +1,233 @@
@@ -16875,7 +16888,7 @@ index 0000000..e387ca9
 +   * @param string $scheme
 +   *   The scheme to find an adapter for.
 +   *
-+   * @return \League\Flysystem\AdapterInterface
++   * @return \League\Flysystem\FilesystemAdapter
 +   *   The correct adapter from settings.
 +   */
 +  protected function getAdapter($scheme) {
@@ -16963,6 +16976,19 @@ index aef4626..e9980c5 100644
        }
      }
    }
+diff --git a/src/FlysystemSubAdapterInterface.php b/src/FlysystemSubAdapterInterface.php
+index bf78c2d..f769b65 100644
+--- a/src/FlysystemSubAdapterInterface.php
++++ b/src/FlysystemSubAdapterInterface.php
+@@ -34,7 +34,7 @@ interface FlysystemSubAdapterInterface extends PluginFormInterface, PluginInspec
+    * Builds the Sub Configuration Form components for Form array.
+    *
+    * This method description is the same as that declared in
+-   * \Drupal/flysystem\FlysystemAdapterInterface, but is also included here for
++   * \Drupal\flysystem\FlysystemAdapterInterface, but is also included here for
+    * clarity and documentation of what needs to be implemented in a
+    * sub adapter plugin entity type.
+    *
 diff --git a/src/Form/ConfigForm.php b/src/Form/ConfigForm.php
 new file mode 100644
 index 0000000..1d8bac3
@@ -18037,7 +18063,7 @@ index 0000000..7019cae
 +}
 diff --git a/src/Plugin/FlysystemPluginInterface.php b/src/Plugin/FlysystemPluginInterface.php
 new file mode 100644
-index 0000000..22771fc
+index 0000000..25a2c4f
 --- /dev/null
 +++ b/src/Plugin/FlysystemPluginInterface.php
 @@ -0,0 +1,48 @@
@@ -18057,7 +18083,7 @@ index 0000000..22771fc
 +   * perform filesystem operations, it should either use a scheme:// or have the
 +   * \Drupal\flysystem\FlysystemFactory injected.
 +   *
-+   * @return \League\Flysystem\AdapterInterface
++   * @return \League\Flysystem\FilesystemAdapter
 +   *   The Flysystem adapter.
 +   */
 +  public function getAdapter();
@@ -27165,7 +27191,7 @@ index 0000000..70a91bf
 +}
 diff --git a/tests/src/Unit/Flysystem/Adapter/DrupalCacheAdapterTest.php b/tests/src/Unit/Flysystem/Adapter/DrupalCacheAdapterTest.php
 new file mode 100644
-index 0000000..000d562
+index 0000000..c8f8c40
 --- /dev/null
 +++ b/tests/src/Unit/Flysystem/Adapter/DrupalCacheAdapterTest.php
 @@ -0,0 +1,331 @@
@@ -27178,7 +27204,7 @@ index 0000000..000d562
 +use Drupal\flysystem\Flysystem\Adapter\CacheItemBackend;
 +use Drupal\flysystem\Flysystem\Adapter\DrupalCacheAdapter;
 +use Drupal\Tests\UnitTestCase;
-+use League\Flysystem\AdapterInterface;
++use League\Flysystem\FilesystemAdapter;
 +use League\Flysystem\Config;
 +
 +/**
@@ -27208,7 +27234,7 @@ index 0000000..000d562
 +  /**
 +   * The wrapped Flysystem adapter.
 +   *
-+   * @var \League\Flysystem\AdapterInterface|\PHPUnit_Framework_MockObject_MockObject
++   * @var \League\Flysystem\FilesystemAdapter|\PHPUnit_Framework_MockObject_MockObject
 +   */
 +  protected $adapter;
 +
@@ -27233,7 +27259,7 @@ index 0000000..000d562
 +    parent::setUp();
 +    $time = $this->prophesize(TimeInterface::class)->reveal();
 +    $this->cacheItemBackend = new CacheItemBackend(static::SCHEME, new MemoryBackend($time));
-+    $this->adapter = $this->prophesize(AdapterInterface::class);
++    $this->adapter = $this->prophesize(FilesystemAdapter::class);
 +    $this->cacheAdapter = new DrupalCacheAdapter(static::SCHEME, $this->adapter->reveal(), $this->cacheItemBackend);
 +  }
 +

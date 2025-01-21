@@ -6386,7 +6386,7 @@ index 0000000..4eb3644
 +user_window: 21600
 diff --git a/modules/flysystem_test/config/testing/user.mail.yml b/modules/flysystem_test/config/testing/user.mail.yml
 new file mode 100644
-index 0000000..bf425c0
+index 0000000..a8ee706
 --- /dev/null
 +++ b/modules/flysystem_test/config/testing/user.mail.yml
 @@ -0,0 +1,116 @@
@@ -6506,7 +6506,6 @@ index 0000000..bf425c0
 +    Your account on [site:name] has been canceled.
 +
 +    --  [site:name] team
-\ No newline at end of file
 diff --git a/modules/flysystem_test/config/testing/user.role.anonymous.yml b/modules/flysystem_test/config/testing/user.role.anonymous.yml
 new file mode 100644
 index 0000000..7091583
@@ -12279,17 +12278,19 @@ index 0000000..b5a9697
 +  - flysystem:flysystem
 diff --git a/modules/flysystem_test/flysystem_test.install b/modules/flysystem_test/flysystem_test.install
 new file mode 100644
-index 0000000..7ff920e
+index 0000000..11e8d4b
 --- /dev/null
 +++ b/modules/flysystem_test/flysystem_test.install
-@@ -0,0 +1,17 @@
+@@ -0,0 +1,19 @@
 +<?php
 +
 +/**
-+ * 
++ * @file
++ * Install, update and uninstall functions for the flysystem_test module.
 + */
 +
-+  /**
++
++/**
 + * Implements hook_install().
 + */
 +function flysystem_test_install() {
@@ -16514,7 +16515,7 @@ index 0000000..d2ea885
 +}
 diff --git a/src/FlysystemBridge.php b/src/FlysystemBridge.php
 new file mode 100644
-index 0000000..57db5f6
+index 0000000..04cfe85
 --- /dev/null
 +++ b/src/FlysystemBridge.php
 @@ -0,0 +1,139 @@
@@ -16526,7 +16527,7 @@ index 0000000..57db5f6
 +use Drupal\Core\StringTranslation\StringTranslationTrait;
 +use League\Flysystem\FilesystemInterface;
 +use League\Flysystem\Util;
-+use Codementality\FlysystemStreamWrapper;
++use Codementality\FlysystemStreamWrapper\Flysystem\StreamWrapper as FlysystemStreamWrapper;
 +
 +/**
 + * An adapter for Flysystem to StreamWrapperInterface.
@@ -20839,7 +20840,7 @@ index 0000000..4eb3644
 +user_window: 21600
 diff --git a/tests/fixtures/testing_config_install/install/user.mail.yml b/tests/fixtures/testing_config_install/install/user.mail.yml
 new file mode 100644
-index 0000000..bf425c0
+index 0000000..a8ee706
 --- /dev/null
 +++ b/tests/fixtures/testing_config_install/install/user.mail.yml
 @@ -0,0 +1,116 @@
@@ -20959,7 +20960,6 @@ index 0000000..bf425c0
 +    Your account on [site:name] has been canceled.
 +
 +    --  [site:name] team
-\ No newline at end of file
 diff --git a/tests/fixtures/testing_config_install/install/user.role.administrator.yml b/tests/fixtures/testing_config_install/install/user.role.administrator.yml
 new file mode 100644
 index 0000000..70dd418
