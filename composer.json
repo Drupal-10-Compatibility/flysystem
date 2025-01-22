@@ -31,7 +31,8 @@
         "drupal/core-dev": "^10.3",
         "phpcompatibility/php-compatibility": "8.1.0",
         "phpspec/prophecy": "~1.0",
-        "phpstan/phpstan-deprecation-rules": "^1.0"
+        "phpstan/phpstan-deprecation-rules": "^1.0",
+        "league/flysystem-memory" :"^3.0"
     },
     "conflict": {
         "drupal/drupal": "*"
@@ -120,9 +121,7 @@
                 "Fixing php 8.2 compatibility issues with php-compatibility-sniffer":"patches/php-compatibility-sniffer-8.1-patch.patch"
             },
             "drupal/flysystem": {
-                "Backport 2.3.x code to 3.0.x branch": "patches/pull-2.3.x-code-to-3.0.x-branch.patch",
-                "Update DrupalCacheAdapter for Flysystem 3.x compatibility": "patches/update-drupal-cache-adapter.patch",
-                "Update MissingAdapter for Flysystem 3.x compatibility": "patches/update-drupal-missing-adapter.patch"
+                "Modify tests for Flysystem v3 compatibility": "patches/modify-tests-for-flysystem-v3-compatibility.patch"
             }
         },
         "drupal-lenient": {

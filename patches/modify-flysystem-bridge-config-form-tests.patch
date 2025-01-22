@@ -1,0 +1,28 @@
+diff --git a/tests/src/Unit/FlysystemBridgeTest.php b/tests/src/Unit/FlysystemBridgeTest.php
+index e587e49..b842f84 100644
+--- a/tests/src/Unit/FlysystemBridgeTest.php
++++ b/tests/src/Unit/FlysystemBridgeTest.php
+@@ -27,7 +27,7 @@ class FlysystemBridgeTest extends UnitTestCase {
+   /**
+    * File system.
+    *
+-   * @var \League\Flysystem\FilesystemInterface
++   * @var \League\Flysystem\FilesystemOperator
+    */
+   protected $filesystem;
+ 
+diff --git a/tests/src/Unit/Form/ConfigFormTest.php b/tests/src/Unit/Form/ConfigFormTest.php
+index 32acee1..74d78b4 100644
+--- a/tests/src/Unit/Form/ConfigFormTest.php
++++ b/tests/src/Unit/Form/ConfigFormTest.php
+@@ -9,8 +9,8 @@ namespace Drupal\Tests\flysystem\Unit\Form {
+   use Drupal\flysystem\Form\ConfigForm;
+   use Drupal\Tests\UnitTestCase;
+   use League\Flysystem\Filesystem;
+-  use League\Flysystem\FilesystemInterface;
+-  use League\Flysystem\Memory\MemoryAdapter;
++  use League\Flysystem\FilesystemOperator;
++  use League\Flysystem\InMemory\InMemoryFilesystemAdapter as MemoryAdapter;
+   use Prophecy\Argument;
+   use Psr\Log\LoggerInterface;
+   use Symfony\Component\DependencyInjection\ContainerBuilder;
