@@ -1,0 +1,14 @@
+uuid: 33da38a7-9924-4a93-ac4c-e705d7066e30
+langcode: en
+status: true
+dependencies:
+  module:
+    - media
+_core:
+  default_config_hash: j5zLMOdJBqC0bMvSdth5UebkprJB8g_2FXHqhfpJzow
+id: anonymous
+label: 'Anonymous user'
+weight: 0
+is_admin: false
+permissions:
+  - 'view media'

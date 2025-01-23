@@ -1,0 +1,28 @@
+uuid: c58fc9b5-d3ca-4ae9-b92d-17d160157d05
+langcode: en
+status: true
+dependencies:
+  module:
+    - file
+    - media
+  enforced:
+    module:
+      - media
+_core:
+  default_config_hash: '-LfAI4LSKjFbB16o5ppJ78fGyi9ZI_qAVK2idfj6XFg'
+id: media.field_media_document
+field_name: field_media_document
+entity_type: media
+type: file
+settings:
+  target_type: file
+  display_field: false
+  display_default: false
+  uri_scheme: local-test
+module: file
+locked: false
+cardinality: 1
+translatable: true
+indexes: {  }
+persist_with_no_fields: false
+custom_storage: false

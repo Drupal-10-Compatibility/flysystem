@@ -1,0 +1,24 @@
+_core:
+  default_config_hash: 4GIX5Esnc_umpXUBj4IIocRX7Mt5fPhm4AgXfE3E56E
+module:
+  config: 0
+  dblog: 0
+  field: 0
+  field_ui: 0
+  file: 0
+  filter: 0
+  flysystem: 0
+  flysystem_test: 0
+  image: 0
+  media: 0
+  media_library: 0
+  mysql: 0
+  path_alias: 0
+  system: 0
+  user: 0
+  views_ui: 0
+  views: 10
+  testing: 1000
+theme:
+  claro: 0
+profile: testing
