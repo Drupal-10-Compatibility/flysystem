@@ -1,8 +1,8 @@
 diff --git a/README.md b/README.md
-index 4fa0769..5c31ab1 100644
+index 95a3b69..11e373e 100644
 --- a/README.md
 +++ b/README.md
-@@ -80,6 +80,9 @@ $schemes = [
+@@ -81,6 +81,9 @@ $schemes = [
        // Note: only supports one replication endpoint.
        // Note: Use as a replication endpoint does not prevent that endpoint from
        //   also being used for other purposes. 
@@ -27,177 +27,8 @@ index 0890692..a1463c5 100644
    flysystem_factory:
      class: Drupal\flysystem\FlysystemFactory
      arguments: ['@plugin.manager.flysystem', '@stream_wrapper_manager', '@cache.flysystem', '@event_dispatcher']
-diff --git a/src/Flysystem/Adapter/MissingAdapter.php b/src/Flysystem/Adapter/MissingAdapter.php
-index d946d81..6f8a042 100644
---- a/src/Flysystem/Adapter/MissingAdapter.php
-+++ b/src/Flysystem/Adapter/MissingAdapter.php
-@@ -2,9 +2,10 @@
- 
- namespace Drupal\flysystem\Flysystem\Adapter;
- 
--use League\Flysystem\FilesystemAdapter;
- use League\Flysystem\Config;
-+use League\Flysystem\FilesystemAdapter;
- use League\Flysystem\FileAttributes;
-+use League\Flysystem\Visibility;
- 
- /**
-  * An adapter used when a plugin is missing. It fails at everything.
-@@ -21,48 +22,64 @@ class MissingAdapter implements FilesystemAdapter {
-   /**
-    * {@inheritdoc}
-    */
--  public function directoryExists($path): bool {
-+  public function directoryExists(string $path): bool {
-     return FALSE;
-   }
- 
-   /**
-    * {@inheritdoc}
-    */
--  public function write($path, $contents, Config $config): void {}
-+  public function copy($path, $newPath, Config $config = new Config([])): void {}
- 
-   /**
-    * {@inheritdoc}
-    */
--  public function writeStream($path, $contents, Config $config): void {}
-+  public function createDirectory($dirname, Config $config = new Config([])): void {}
- 
-   /**
-    * {@inheritdoc}
-    */
--  public function read($path): string {
--    return 'FALSE';
-+  public function delete($path): void {}
-+
-+  /**
-+   * {@inheritdoc}
-+   */
-+  public function deleteDirectory($dirname): void {}
-+
-+  /**
-+   * {@inheritdoc}
-+   */
-+  public function listContents($directory = '', $recursive = FALSE): iterable {
-+    return [];
-   }
- 
-   /**
-    * {@inheritdoc}
-    */
--  public function readStream($path) {
--    return FALSE;
-+  public function mimeType($path): FileAttributes {
-+    return new FileAttributes($path, NULL, NULL, NULL, 'plain/text');
-   }
- 
-   /**
-    * {@inheritdoc}
-    */
--  public function delete($path): void {}
-+  public function fileSize($path): FileAttributes {
-+    return new FileAttributes($path, 1234, NULL, NULL, NULL);
-+  }
- 
-   /**
-    * {@inheritdoc}
-    */
--  public function deleteDirectory($dirname): void {}
-+  public function lastModified($path): FileAttributes {
-+    return new FileAttributes($path, NULL, NULL, $now = time(), NULL);
-+  }
- 
-   /**
-    * {@inheritdoc}
-    */
--  public function createDirectory($dirname, Config $config): void {}
-+  public function visibility($path): FileAttributes {
-+    return Visibility::PRIVATE;
-+  }
- 
-   /**
-    * {@inheritdoc}
-@@ -72,46 +89,40 @@ class MissingAdapter implements FilesystemAdapter {
-   /**
-    * {@inheritdoc}
-    */
--  public function visibility(string $path): FileAttributes {
--    return new FileAttributes($path);
--  }
-+  public function update($path, $contents, Config $config = new Config([])): void {}
- 
-   /**
-    * {@inheritdoc}
-    */
--  public function mimeType(string $path): FileAttributes {
--    return new FileAttributes($path);
--  }
-+  public function updateStream($path, $resource, Config $config = new Config([])): void {}
- 
-   /**
-    * {@inheritdoc}
-    */
--  public function lastModified(string $path): FileAttributes {
--    return new FileAttributes($path);
-+  public function read($path): string {
-+    return '';
-   }
- 
-   /**
-    * {@inheritdoc}
-    */
--  public function fileSize(string $path): FileAttributes {
--    return new FileAttributes($path);
-+  public function readStream($path) {
-+    return '';
-   }
- 
-   /**
-    * {@inheritdoc}
-    */
--  public function listContents($directory = '', $recursive = FALSE): iterable {
--    return [];
--  }
-+  public function move($path, $newPath, Config $config = new Config([])): void {}
- 
-   /**
-    * {@inheritdoc}
-    */
--  public function copy($source, $destination, Config $config): void {}
-+  public function write($path, $contents, Config $config = new Config([])): void {}
- 
-   /**
-    * {@inheritdoc}
-    */
--  public function move($source, $destination, Config $config): void {}
-+  public function writeStream($path, $resource, Config $config = new Config([])): void {}
- 
- }
-diff --git a/src/FlysystemFactory.php b/src/FlysystemFactory.php
-index 3b07e89..24da300 100644
---- a/src/FlysystemFactory.php
-+++ b/src/FlysystemFactory.php
-@@ -48,7 +48,7 @@ class FlysystemFactory {
-   /**
-    * A cache of filesystems.
-    *
--   * @var \League\Flysystem\FilesystemInterface[]
-+   * @var \League\Flysystem\FilesystemOperator[]
-    */
-   protected $filesystems = [];
- 
-@@ -108,7 +108,7 @@ class FlysystemFactory {
-    * @param string $scheme
-    *   The scheme.
-    *
--   * @return \League\Flysystem\FilesystemInterface
-+   * @return \League\Flysystem\FilesystemOperator
-    *   The filesystem for the scheme.
-    */
-   public function getFilesystem($scheme) {
 diff --git a/tests/src/Unit/Flysystem/Adapter/DrupalCacheAdapterTest.php b/tests/src/Unit/Flysystem/Adapter/DrupalCacheAdapterTest.php
-index c8f8c40..014e073 100644
+index c8f8c40..af86a37 100644
 --- a/tests/src/Unit/Flysystem/Adapter/DrupalCacheAdapterTest.php
 +++ b/tests/src/Unit/Flysystem/Adapter/DrupalCacheAdapterTest.php
 @@ -7,8 +7,9 @@ use Drupal\Core\Cache\MemoryBackend;
@@ -243,7 +74,7 @@ index c8f8c40..014e073 100644
    }
  
    /**
-@@ -88,64 +98,45 @@ class DrupalCacheAdapterTest extends UnitTestCase {
+@@ -88,64 +98,44 @@ class DrupalCacheAdapterTest extends UnitTestCase {
      $config = new Config();
      $stream = fopen('data:text/plain,contents', 'rb');
  
@@ -336,11 +167,10 @@ index c8f8c40..014e073 100644
 +    catch (\Throwable $e) {
 +      $this->fail();
 +    }
-+    
  
      $this->assertFalse($this->cacheItemBackend->has(static::FILE));
      $this->assertTrue($this->cacheItemBackend->has('new.txt'));
-@@ -157,18 +148,23 @@ class DrupalCacheAdapterTest extends UnitTestCase {
+@@ -157,18 +147,23 @@ class DrupalCacheAdapterTest extends UnitTestCase {
     */
    public function testCopySuccess() {
      $config = new Config();
@@ -413,137 +243,6 @@ index 7bae52f..7a85d83 100644
    }
  
  }
-diff --git a/tests/src/Unit/Flysystem/FtpTest.php b/tests/src/Unit/Flysystem/FtpTest.php
-deleted file mode 100644
-index a4063b4..0000000
---- a/tests/src/Unit/Flysystem/FtpTest.php
-+++ /dev/null
-@@ -1,125 +0,0 @@
--<?php
--
--namespace Drupal\Tests\flysystem\Unit\Flysystem {
--
--  use Drupal\Core\Logger\RfcLogLevel;
--  use Drupal\flysystem\Flysystem\Adapter\MissingAdapter;
--  use Drupal\flysystem\Flysystem\Ftp;
--  use Drupal\Tests\UnitTestCase;
--  use League\Flysystem\Adapter\Ftp as LeagueFtp;
--
--  /**
--   * @coversDefaultClass \Drupal\flysystem\Flysystem\Ftp
--   * @group flysystem
--   */
--  class FtpTest extends UnitTestCase {
--
--    /**
--     * {@inheritdoc}
--     */
--    public function setUp(): void {
--      parent::setUp();
--      if (!defined('FTP_BINARY')) {
--        $this->markTestSkipped('The FTP_BINARY constant is not defined.');
--      }
--    }
--
--    /**
--     * @covers ::getAdapter
--     * @covers ::__construct
--     */
--    public function testGetAdapterSuccess() {
--      $plugin = new Ftp(['host' => 'success']);
--      $this->assertInstanceOf(LeagueFtp::class, $plugin->getAdapter());
--    }
--
--    /**
--     * @covers ::getAdapter
--     * @covers ::__construct
--     */
--    public function testGetAdapterFails() {
--      $plugin = new Ftp([]);
--      $this->assertInstanceOf(MissingAdapter::class, $plugin->getAdapter());
--    }
--
--    /**
--     * @covers ::ensure
--     */
--    public function testEnsureReturnsNoErrorsOnSuccess() {
--      $result = (new Ftp(['host' => 'success']))->ensure();
--
--      $this->assertCount(1, $result);
--      $this->assertSame(RfcLogLevel::INFO, $result[0]['severity']);
--    }
--
--    /**
--     * @covers ::ensure
--     */
--    public function testEnsureReturnsErrors() {
--      $plugin = new Ftp([]);
--      $result = $plugin->ensure();
--      $this->assertCount(1, $result);
--      $this->assertSame(21, $result[0]['context']['%port']);
--    }
--
--  }
--}
--
--namespace League\Flysystem\Adapter {
--
--  /**
--   * Stubs ftp_chdir().
--   */
--  function ftp_chdir() {
--    return TRUE;
--  }
--
--  /**
--   * Stubs ftp_close().
--   */
--  function ftp_close() {
--  }
--
--  /**
--   * Stubs ftp_connect().
--   */
--  function ftp_connect($host) {
--    return $host === 'success';
--  }
--
--  /**
--   * Stubs ftp_login().
--   */
--  function ftp_login() {
--    return TRUE;
--  }
--
--  /**
--   * Stubs ftp_pasv().
--   */
--  function ftp_pasv() {
--    return TRUE;
--  }
--
--  /**
--   * Stubs ftp_pwd().
--   */
--  function ftp_pwd() {
--    return '';
--  }
--
--  /**
--   * Stubs ftp_systype().
--   */
--  function ftp_systype() {
--    return TRUE;
--  }
--
--  /**
--   * Stubs ftp_raw().
--   */
--  function ftp_raw() {
--    return ['200'];
--  }
--
--}
 diff --git a/tests/src/Unit/Flysystem/LocalTest.php b/tests/src/Unit/Flysystem/LocalTest.php
 index 4123f0f..fad8d1f 100644
 --- a/tests/src/Unit/Flysystem/LocalTest.php
