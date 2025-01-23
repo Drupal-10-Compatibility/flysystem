@@ -28,7 +28,7 @@ index 0890692..a1463c5 100644
      class: Drupal\flysystem\FlysystemFactory
      arguments: ['@plugin.manager.flysystem', '@stream_wrapper_manager', '@cache.flysystem', '@event_dispatcher']
 diff --git a/tests/src/Unit/Flysystem/Adapter/DrupalCacheAdapterTest.php b/tests/src/Unit/Flysystem/Adapter/DrupalCacheAdapterTest.php
-index c8f8c40..af86a37 100644
+index c8f8c40..82c5c32 100644
 --- a/tests/src/Unit/Flysystem/Adapter/DrupalCacheAdapterTest.php
 +++ b/tests/src/Unit/Flysystem/Adapter/DrupalCacheAdapterTest.php
 @@ -7,8 +7,9 @@ use Drupal\Core\Cache\MemoryBackend;
@@ -42,10 +42,11 @@ index c8f8c40..af86a37 100644
  
  /**
   * Test the Drupal Cache Adapter.
-@@ -71,14 +72,23 @@ class DrupalCacheAdapterTest extends UnitTestCase {
+@@ -70,82 +71,71 @@ class DrupalCacheAdapterTest extends UnitTestCase {
+    * Tests creating a public file.
     */
    public function testWriteSuccess() {
-     $config = new Config();
+-    $config = new Config();
 -    $this->adapter
 -      ->write(static::FILE, 'contents', $config)
 -      ->willReturn(['visibility' => 'public']);
@@ -54,6 +55,7 @@ index c8f8c40..af86a37 100644
 -    $this->assertSame('public', $metadata['visibility']);
 -    $this->assertSame('public', $this->cacheAdapter->getVisibility(static::FILE)['visibility']);
 -    $this->assertTrue($this->cacheItemBackend->has(static::FILE));
++    $config = new Config([]);
 +    // Test Cache adapter write does not fail.
 +    try {
 +      try {
@@ -74,10 +76,12 @@ index c8f8c40..af86a37 100644
    }
  
    /**
-@@ -88,64 +98,44 @@ class DrupalCacheAdapterTest extends UnitTestCase {
-     $config = new Config();
-     $stream = fopen('data:text/plain,contents', 'rb');
- 
+    * Tests creating a public file stream.
+    */
+   public function testWriteStreamSuccess() {
+-    $config = new Config();
+-    $stream = fopen('data:text/plain,contents', 'rb');
+-
 -    $this->adapter
 -      ->writeStream(static::FILE, $stream, $config)
 -      ->willReturn(['timestamp' => 12345]);
@@ -107,8 +111,9 @@ index c8f8c40..af86a37 100644
 -   */
 -  public function testUpdateStreamSuccess() {
 -    $config = new Config();
--    $stream = fopen('data:text/plain,contents', 'rb');
--
++    $config = new Config([]);
+     $stream = fopen('data:text/plain,contents', 'rb');
+ 
 -    $this->adapter
 -      ->updateStream(static::FILE, $stream, $config)
 -      ->willReturn(['mimetype' => 'test_mimetype']);
@@ -140,12 +145,13 @@ index c8f8c40..af86a37 100644
     * Tests renaming a file.
     */
 -  public function testRenameSuccess() {
-+  public function testMoveSuccess() {
-     $config = new Config();
+-    $config = new Config();
 -    $this->adapter
 -      ->write(static::FILE, 'contents', $config)
 -      ->willReturn(['size' => 1234]);
 -
++  public function testMoveSuccess() {
++    $config = new Config([]);
      $this->cacheAdapter->write(static::FILE, 'contents', $config);
 -
 -    $this->adapter
@@ -170,17 +176,21 @@ index c8f8c40..af86a37 100644
  
      $this->assertFalse($this->cacheItemBackend->has(static::FILE));
      $this->assertTrue($this->cacheItemBackend->has('new.txt'));
-@@ -157,18 +147,23 @@ class DrupalCacheAdapterTest extends UnitTestCase {
+@@ -156,19 +146,23 @@ class DrupalCacheAdapterTest extends UnitTestCase {
+    * Tests copying a file.
     */
    public function testCopySuccess() {
-     $config = new Config();
+-    $config = new Config();
 -    $this->adapter
 -      ->write(static::FILE, 'contents', $config)
 -      ->willReturn(['size' => 1234]);
 -
++    $config = new Config([]);
      $this->cacheAdapter->write(static::FILE, 'contents', $config);
-+    $fileSize = $this->cacheAdapter->fileSize(static::FILE);
-+
+ 
+-    $this->adapter->copy(static::FILE, 'new.txt')->willReturn(TRUE);
+-
+-    $this->assertTrue($this->cacheAdapter->copy(static::FILE, 'new.txt'));
 +    // Test Cache adapter move does not fail.
 +    try {
 +      try {
@@ -195,15 +205,47 @@ index c8f8c40..af86a37 100644
 +      $this->fail();
 +    }
  
--    $this->adapter->copy(static::FILE, 'new.txt')->willReturn(TRUE);
--
--    $this->assertTrue($this->cacheAdapter->copy(static::FILE, 'new.txt'));
--
 -    $this->assertSame(1234, $this->cacheAdapter->getSize(static::FILE)['size']);
 -    $this->assertSame(1234, $this->cacheAdapter->getSize('new.txt')['size']);
      $this->assertTrue($this->cacheItemBackend->has(static::FILE));
      $this->assertTrue($this->cacheItemBackend->has('new.txt'));
    }
+@@ -177,7 +171,7 @@ class DrupalCacheAdapterTest extends UnitTestCase {
+    * Tests deleting a file.
+    */
+   public function testDeleteSuccess() {
+-    $config = new Config();
++    $config = new Config([]);
+     $this->adapter
+       ->write(static::FILE, 'contents', $config)
+       ->willReturn(['size' => 1234]);
+@@ -194,7 +188,7 @@ class DrupalCacheAdapterTest extends UnitTestCase {
+    * Tests deleting a file directory.
+    */
+   public function testDeleteDirSuccess() {
+-    $config = new Config();
++    $config = new Config([]);
+     // Create a directory with one sub file.
+     $this->adapter->createDir('test_dir', $config)->willReturn(['type' => 'dir']);
+     $this->adapter->write('test_dir/test.txt', 'contents', $config)
+@@ -252,7 +246,7 @@ class DrupalCacheAdapterTest extends UnitTestCase {
+     $this->adapter->read(static::FILE)->willReturn(FALSE);
+     $this->assertFalse($this->cacheAdapter->read(static::FILE));
+ 
+-    $config = new Config();
++    $config = new Config([]);
+     $this->adapter
+       ->write(static::FILE, 'contents', $config);
+     $return = [
+@@ -271,7 +265,7 @@ class DrupalCacheAdapterTest extends UnitTestCase {
+     $this->adapter->readStream(static::FILE)->willReturn(FALSE);
+     $this->assertFalse($this->cacheAdapter->readStream(static::FILE));
+ 
+-    $config = new Config();
++    $config = new Config([]);
+     $stream = fopen('data:text/plain,contents', 'rb');
+     $this->adapter
+       ->writeStream(static::FILE, $stream, $config);
 diff --git a/tests/src/Unit/Flysystem/Adapter/MissingAdapterTest.php b/tests/src/Unit/Flysystem/Adapter/MissingAdapterTest.php
 index 7bae52f..7a85d83 100644
 --- a/tests/src/Unit/Flysystem/Adapter/MissingAdapterTest.php
