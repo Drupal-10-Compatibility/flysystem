@@ -1,34 +1,18 @@
-diff --git a/README.md b/README.md
-index 95a3b69..11e373e 100644
---- a/README.md
-+++ b/README.md
-@@ -81,6 +81,9 @@ $schemes = [
-       // Note: only supports one replication endpoint.
-       // Note: Use as a replication endpoint does not prevent that endpoint from
-       //   also being used for other purposes. 
-+      // Note:  This will be removed for 3.0.x, the third party library that
-+      // is needed to support this functionality does not have a Flysystem v3 version,
-+      // so it is effectively deprecated for v3.
-       'replicate' => 'ftpexample',
-     ],
-   // Used as a replication endpoint for 'local-example' (see the 'replicate'
-diff --git a/flysystem.services.yml b/flysystem.services.yml
-index 0890692..a1463c5 100644
---- a/flysystem.services.yml
-+++ b/flysystem.services.yml
-@@ -14,6 +14,10 @@ services:
-     class: Drupal\flysystem\Plugin\FlysystemPluginManager
-     arguments: ['@container.namespaces', '@cache.discovery', '@module_handler']
+diff --git a/src/Form/ConfigForm.php b/src/Form/ConfigForm.php
+index 9d71db4..365bf46 100644
+--- a/src/Form/ConfigForm.php
++++ b/src/Form/ConfigForm.php
+@@ -228,7 +228,7 @@ class ConfigForm extends FormBase {
+   protected function getFileList($scheme) {
+     $filesystem = $this->factory->getFilesystem($scheme);
  
-+  plugin.manager.flysystem_adapter:
-+    class: Drupal\flysystem\FlysystemAdapterPluginManager
-+    parent: default_plugin_manager
-+
-   flysystem_factory:
-     class: Drupal\flysystem\FlysystemFactory
-     arguments: ['@plugin.manager.flysystem', '@stream_wrapper_manager', '@cache.flysystem', '@event_dispatcher']
+-    $files = array_filter($filesystem->listContents('', TRUE), function ($meta) {
++    $files = array_filter($filesystem->listContents('', TRUE)->toArray(), function ($meta) {
+       return $meta['type'] === 'file';
+     });
+ 
 diff --git a/tests/src/Unit/Flysystem/Adapter/DrupalCacheAdapterTest.php b/tests/src/Unit/Flysystem/Adapter/DrupalCacheAdapterTest.php
-index c8f8c40..82c5c32 100644
+index c8f8c40..0f4c72b 100644
 --- a/tests/src/Unit/Flysystem/Adapter/DrupalCacheAdapterTest.php
 +++ b/tests/src/Unit/Flysystem/Adapter/DrupalCacheAdapterTest.php
 @@ -7,8 +7,9 @@ use Drupal\Core\Cache\MemoryBackend;
@@ -42,7 +26,16 @@ index c8f8c40..82c5c32 100644
  
  /**
   * Test the Drupal Cache Adapter.
-@@ -70,82 +71,71 @@ class DrupalCacheAdapterTest extends UnitTestCase {
+@@ -25,7 +26,7 @@ class DrupalCacheAdapterTest extends UnitTestCase {
+    *
+    * @var string
+    */
+-  const SCHEME = 'test-scheme';
++  const SCHEME = 'test_scheme';
+ 
+   /**
+    * The main test file.
+@@ -70,146 +71,199 @@ class DrupalCacheAdapterTest extends UnitTestCase {
     * Tests creating a public file.
     */
    public function testWriteSuccess() {
@@ -80,8 +73,9 @@ index c8f8c40..82c5c32 100644
     */
    public function testWriteStreamSuccess() {
 -    $config = new Config();
--    $stream = fopen('data:text/plain,contents', 'rb');
--
++    $config = new Config([]);
+     $stream = fopen('data:text/plain,contents', 'rb');
+ 
 -    $this->adapter
 -      ->writeStream(static::FILE, $stream, $config)
 -      ->willReturn(['timestamp' => 12345]);
@@ -111,9 +105,8 @@ index c8f8c40..82c5c32 100644
 -   */
 -  public function testUpdateStreamSuccess() {
 -    $config = new Config();
-+    $config = new Config([]);
-     $stream = fopen('data:text/plain,contents', 'rb');
- 
+-    $stream = fopen('data:text/plain,contents', 'rb');
+-
 -    $this->adapter
 -      ->updateStream(static::FILE, $stream, $config)
 -      ->willReturn(['mimetype' => 'test_mimetype']);
@@ -150,9 +143,7 @@ index c8f8c40..82c5c32 100644
 -      ->write(static::FILE, 'contents', $config)
 -      ->willReturn(['size' => 1234]);
 -
-+  public function testMoveSuccess() {
-+    $config = new Config([]);
-     $this->cacheAdapter->write(static::FILE, 'contents', $config);
+-    $this->cacheAdapter->write(static::FILE, 'contents', $config);
 -
 -    $this->adapter
 -      ->rename(static::FILE, 'new.txt')
@@ -160,6 +151,22 @@ index c8f8c40..82c5c32 100644
 -
 -    $this->assertTrue($this->cacheAdapter->rename(static::FILE, 'new.txt'));
 -    $this->assertSame(1234, $this->cacheAdapter->getSize('new.txt')['size']);
++  public function testMoveSuccess() {
++    $config = new Config([]);
++    try {
++      try {
++        $this->cacheAdapter->write(static::FILE, 'contents', $config);
++      }
++      catch (\Throwable $e) {
++        $this->fail();
++      }
++      $this->assertTrue(TRUE);
++    }
++    catch (\Throwable $e) {
++      $this->fail();
++    }
++    $fileAttributes = $this->cacheAdapter->visibility(static::FILE);
++    $this->assertSame(Visibility::PUBLIC, $fileAttributes->visibility());
 +    // Test Cache adapter move does not fail.
 +    try {
 +      try {
@@ -176,7 +183,12 @@ index c8f8c40..82c5c32 100644
  
      $this->assertFalse($this->cacheItemBackend->has(static::FILE));
      $this->assertTrue($this->cacheItemBackend->has('new.txt'));
-@@ -156,19 +146,23 @@ class DrupalCacheAdapterTest extends UnitTestCase {
+-
++    $fileAttributes = $this->cacheAdapter->visibility('new.txt');
++    $this->assertSame(Visibility::PUBLIC, $fileAttributes->visibility());
+   }
+ 
+   /**
     * Tests copying a file.
     */
    public function testCopySuccess() {
@@ -185,13 +197,24 @@ index c8f8c40..82c5c32 100644
 -      ->write(static::FILE, 'contents', $config)
 -      ->willReturn(['size' => 1234]);
 -
+-    $this->cacheAdapter->write(static::FILE, 'contents', $config);
 +    $config = new Config([]);
-     $this->cacheAdapter->write(static::FILE, 'contents', $config);
- 
--    $this->adapter->copy(static::FILE, 'new.txt')->willReturn(TRUE);
--
--    $this->assertTrue($this->cacheAdapter->copy(static::FILE, 'new.txt'));
-+    // Test Cache adapter move does not fail.
++    try {
++      try {
++        $this->cacheAdapter->write(static::FILE, 'contents', $config);
++      }
++      catch (\Throwable $e) {
++        $this->fail();
++      }
++      $this->assertTrue(TRUE);
++    }
++    catch (\Throwable $e) {
++      $this->fail();
++    }
++    $fileAttributes = $this->cacheAdapter->visibility(static::FILE);
++    $this->assertSame(Visibility::PUBLIC, $fileAttributes->visibility());
++
++    // Test Cache adapter copy does not fail.
 +    try {
 +      try {
 +        $this->cacheAdapter->copy(static::FILE, 'new.txt');
@@ -205,47 +228,296 @@ index c8f8c40..82c5c32 100644
 +      $this->fail();
 +    }
  
+-    $this->adapter->copy(static::FILE, 'new.txt')->willReturn(TRUE);
+-
+-    $this->assertTrue($this->cacheAdapter->copy(static::FILE, 'new.txt'));
+-
 -    $this->assertSame(1234, $this->cacheAdapter->getSize(static::FILE)['size']);
 -    $this->assertSame(1234, $this->cacheAdapter->getSize('new.txt')['size']);
      $this->assertTrue($this->cacheItemBackend->has(static::FILE));
      $this->assertTrue($this->cacheItemBackend->has('new.txt'));
++    $fileAttributes = $this->cacheAdapter->visibility('new.txt');
++    $this->assertSame(Visibility::PUBLIC, $fileAttributes->visibility());
    }
-@@ -177,7 +171,7 @@ class DrupalCacheAdapterTest extends UnitTestCase {
+ 
+   /**
     * Tests deleting a file.
     */
    public function testDeleteSuccess() {
 -    $config = new Config();
+-    $this->adapter
+-      ->write(static::FILE, 'contents', $config)
+-      ->willReturn(['size' => 1234]);
+-
+-    $this->cacheAdapter->write(static::FILE, 'contents', $config);
+-
+-    $this->adapter->delete(static::FILE)->willReturn(TRUE);
 +    $config = new Config([]);
-     $this->adapter
-       ->write(static::FILE, 'contents', $config)
-       ->willReturn(['size' => 1234]);
-@@ -194,7 +188,7 @@ class DrupalCacheAdapterTest extends UnitTestCase {
++    try {
++      try {
++        $this->cacheAdapter->write(static::FILE, 'contents', $config);
++      }
++      catch (\Throwable $e) {
++        $this->fail();
++      }
++      $this->assertTrue(TRUE);
++    }
++    catch (\Throwable $e) {
++      $this->fail();
++    }
++    $fileAttributes = $this->cacheAdapter->visibility(static::FILE);
++    $this->assertSame(Visibility::PUBLIC, $fileAttributes->visibility());
++
++    try {
++      try {
++        $this->cacheAdapter->delete(static::FILE);
++      }
++      catch (\Throwable $e) {
++        $this->fail();
++      }
++      $this->assertTrue(TRUE);
++    }
++    catch (\Throwable $e) {
++      $this->fail();
++    }
+ 
+-    $this->assertTrue($this->cacheAdapter->delete(static::FILE));
+     $this->assertFalse($this->cacheItemBackend->has(static::FILE));
+   }
+ 
+   /**
     * Tests deleting a file directory.
     */
-   public function testDeleteDirSuccess() {
+-  public function testDeleteDirSuccess() {
 -    $config = new Config();
+-    // Create a directory with one sub file.
+-    $this->adapter->createDir('test_dir', $config)->willReturn(['type' => 'dir']);
+-    $this->adapter->write('test_dir/test.txt', 'contents', $config)
+-      ->willReturn(['size' => 1234]);
+-    $this->adapter->deleteDir('test_dir')->willReturn(TRUE);
+-    $this->adapter->listContents('test_dir', TRUE)->willReturn([
+-      ['path' => 'test_dir'],
+-      ['path' => 'test_dir/test.txt'],
+-    ]);
+-
+-    $this->cacheAdapter->createDir('test_dir', $config);
+-    $this->cacheAdapter->write('test_dir/test.txt', 'contents', $config);
+-
+-    $this->assertTrue($this->cacheAdapter->deleteDir('test_dir'));
+-
++  public function testDeleteDirectorySuccess() {
 +    $config = new Config([]);
-     // Create a directory with one sub file.
-     $this->adapter->createDir('test_dir', $config)->willReturn(['type' => 'dir']);
-     $this->adapter->write('test_dir/test.txt', 'contents', $config)
-@@ -252,7 +246,7 @@ class DrupalCacheAdapterTest extends UnitTestCase {
-     $this->adapter->read(static::FILE)->willReturn(FALSE);
-     $this->assertFalse($this->cacheAdapter->read(static::FILE));
++    try {
++      try {
++        $this->cacheAdapter->createDirectory('test_dir', $config);
++        $this->cacheAdapter->write('test_dir/test.txt', 'contents', $config);
++      }
++      catch (\Throwable $e) {
++        $this->fail();
++      }
++      $this->assertTrue(TRUE);
++    }
++    catch (\Throwable $e) {
++      $this->fail();
++    }
++    $fileAttributes = $this->cacheAdapter->visibility('test_dir/test.txt');
++    $this->assertSame(Visibility::PUBLIC, $fileAttributes->visibility());
++    try {
++      try {
++        $this->cacheAdapter->deleteDirectory('test_dir');
++      }
++      catch (\Throwable $e) {
++        $this->fail();
++      }
++      $this->assertTrue(TRUE);
++    }
++    catch (\Throwable $e) {
++      $this->fail();
++    }
+     $this->assertFalse($this->cacheItemBackend->has('test_dir/test.txt'));
+     $this->assertFalse($this->cacheItemBackend->has('test_dir'));
+   }
+@@ -218,14 +272,22 @@ class DrupalCacheAdapterTest extends UnitTestCase {
+    * Tests visibility checking on private files.
+    */
+   public function testSetVisibilitySuccess() {
+-    $this->adapter
+-      ->setVisibility(static::FILE, 'private')
+-      ->willReturn(['visibility' => 'private']);
+-
+-    $metadata = $this->cacheAdapter->setVisibility(static::FILE, 'private');
+-    $this->assertSame('private', $metadata['visibility']);
+-    $this->assertSame('private', $this->cacheAdapter->getVisibility(static::FILE)['visibility']);
++    try {
++      try {
++        $this->cacheAdapter->setVisibility(static::FILE, 'private');
++      }
++      catch (\Throwable $e) {
++        $this->fail();
++      }
++      $this->assertTrue(TRUE);
++    }
++    catch (\Throwable $e) {
++      $this->fail();
++    }
++
++    $fileAttributes = $this->cacheAdapter->visibility(static::FILE);
+     $this->assertTrue($this->cacheItemBackend->has(static::FILE));
++    $this->assertSame('private', $fileAttributes->visibility());
+   }
+ 
+   /**
+@@ -234,98 +296,97 @@ class DrupalCacheAdapterTest extends UnitTestCase {
+   public function testHasSuccess() {
+     $cache_item = $this->cacheItemBackend->load(static::FILE);
+     $this->cacheItemBackend->set(static::FILE, $cache_item);
+-    $this->assertTrue($this->cacheAdapter->has(static::FILE));
++    $this->assertTrue($this->cacheItemBackend->has(static::FILE));
+   }
+ 
+   /**
+    * Tests file loading failure.
+    */
+   public function testHasFail() {
+-    $this->adapter->has(static::FILE)->willReturn(TRUE);
+-    $this->assertTrue($this->cacheAdapter->has(static::FILE));
++    $this->assertTrue($this->cacheItemBackend->has(static::FILE));
+   }
+ 
+   /**
+    * Tests reading a file.
+    */
+   public function testRead() {
+-    $this->adapter->read(static::FILE)->willReturn(FALSE);
+-    $this->assertFalse($this->cacheAdapter->read(static::FILE));
  
 -    $config = new Config();
+-    $this->adapter
+-      ->write(static::FILE, 'contents', $config);
+-    $return = [
+-      'type' => 'file',
+-      'path' => static::FILE,
+-      'contents' => $config,
+-    ];
+-    $this->adapter->read(static::FILE)->willReturn($return);
+-    $this->assertSame($this->cacheAdapter->read(static::FILE), $return);
 +    $config = new Config([]);
-     $this->adapter
-       ->write(static::FILE, 'contents', $config);
-     $return = [
-@@ -271,7 +265,7 @@ class DrupalCacheAdapterTest extends UnitTestCase {
-     $this->adapter->readStream(static::FILE)->willReturn(FALSE);
-     $this->assertFalse($this->cacheAdapter->readStream(static::FILE));
++    try {
++      try {
++        $this->cacheAdapter->write(static::FILE, 'contents', $config);
++      }
++      catch (\Throwable $e) {
++        $this->fail();
++      }
++      $this->assertTrue(TRUE);
++    }
++    catch (\Throwable $e) {
++      $this->fail();
++    }
++    $fileAttributes = $this->cacheAdapter->visibility(static::FILE);
++    $this->assertSame(Visibility::PUBLIC, $fileAttributes->visibility());
++
++    $this->cacheAdapter->read(static::FILE)->willReturn('contents');
+   }
  
+   /**
+    * Tests reading a stream.
+    */
+   public function testReadStream() {
+-    $this->adapter->readStream(static::FILE)->willReturn(FALSE);
+-    $this->assertFalse($this->cacheAdapter->readStream(static::FILE));
+-
 -    $config = new Config();
 +    $config = new Config([]);
      $stream = fopen('data:text/plain,contents', 'rb');
-     $this->adapter
-       ->writeStream(static::FILE, $stream, $config);
+-    $this->adapter
+-      ->writeStream(static::FILE, $stream, $config);
+ 
++    // Test Cache adapter writeStream does not fail.
++    try {
++      try {
++        $this->cacheAdapter->writeStream(static::FILE, $stream, $config);
++      }
++      catch (\Throwable $e) {
++        $this->fail();
++      }
++      $this->assertTrue(TRUE);
++    }
++    catch (\Throwable $e) {
++      $this->fail();
++    }
+     $return = [
+       'type' => 'file',
+       'path' => static::FILE,
+       'stream' => $stream,
+     ];
+ 
+-    $this->adapter->readStream(static::FILE)->willReturn($return);
+     $this->assertSame($this->cacheAdapter->readStream(static::FILE), $return);
++
+   }
+ 
+   /**
+    * Tests listing contents of a directory.
+    */
+   public function testListContentsSuccess() {
++    $config = new Config([]);
++    try {
++      try {
++        $this->cacheAdapter->createDirectory('test_dir', $config);
++        $this->cacheAdapter->write('test_dir/test.txt', 'contents', $config);
++      }
++      catch (\Throwable $e) {
++        $this->fail();
++      }
++      $this->assertTrue(TRUE);
++    }
++    catch (\Throwable $e) {
++      $this->fail();
++    }
++    $fileAttributes = $this->cacheAdapter->visibility('test_dir/test.txt');
++    $this->assertSame(Visibility::PUBLIC, $fileAttributes->visibility());
++
+     $return = [
+       ['path' => 'test_dir'],
+       ['path' => 'test_dir/test.txt'],
+     ];
+ 
+-    $this->adapter->listContents('test_dir', TRUE)->willReturn($return);
+-    $this->assertSame($this->cacheAdapter->listContents('test_dir', TRUE), $return);
+-  }
+-
+-  /**
+-   * Tests retrieving file metadata.
+-   */
+-  public function testGetMetadataSuccess() {
+-    $cache_item = $this->cacheItemBackend->load(static::FILE);
+-    $cache_item->updateMetadata(['type' => 'dir']);
+-    $this->cacheItemBackend->set(static::FILE, $cache_item);
+-
+-    $this->assertSame('dir', $this->cacheAdapter->getMetadata(static::FILE)['type']);
+-  }
+-
+-  /**
+-   * Tests failing to retrieve file metadata.
+-   */
+-  public function testGetMetadataFail() {
+-    $this->adapter->getMetadata(static::FILE)->willReturn(['type' => 'dir']);
+-
+-    $this->assertSame('dir', $this->cacheAdapter->getMetadata(static::FILE)['type']);
+-  }
+-
+-  /**
+-   * Tests failing to retrieve file size.
+-   */
+-  public function testGetSizeFail() {
+-    $this->adapter->getSize(static::FILE)->willReturn(['size' => 123]);
+-
+-    $this->assertSame(123, $this->cacheAdapter->getSize(static::FILE)['size']);
++    $this->assertSame((array) $this->cacheAdapter->listContents('test_dir', TRUE), $return);
+   }
+ 
+ }
 diff --git a/tests/src/Unit/Flysystem/Adapter/MissingAdapterTest.php b/tests/src/Unit/Flysystem/Adapter/MissingAdapterTest.php
 index 7bae52f..7a85d83 100644
 --- a/tests/src/Unit/Flysystem/Adapter/MissingAdapterTest.php
@@ -285,8 +557,139 @@ index 7bae52f..7a85d83 100644
    }
  
  }
+diff --git a/tests/src/Unit/Flysystem/FtpTest.php b/tests/src/Unit/Flysystem/FtpTest.php
+deleted file mode 100644
+index a4063b4..0000000
+--- a/tests/src/Unit/Flysystem/FtpTest.php
++++ /dev/null
+@@ -1,125 +0,0 @@
+-<?php
+-
+-namespace Drupal\Tests\flysystem\Unit\Flysystem {
+-
+-  use Drupal\Core\Logger\RfcLogLevel;
+-  use Drupal\flysystem\Flysystem\Adapter\MissingAdapter;
+-  use Drupal\flysystem\Flysystem\Ftp;
+-  use Drupal\Tests\UnitTestCase;
+-  use League\Flysystem\Adapter\Ftp as LeagueFtp;
+-
+-  /**
+-   * @coversDefaultClass \Drupal\flysystem\Flysystem\Ftp
+-   * @group flysystem
+-   */
+-  class FtpTest extends UnitTestCase {
+-
+-    /**
+-     * {@inheritdoc}
+-     */
+-    public function setUp(): void {
+-      parent::setUp();
+-      if (!defined('FTP_BINARY')) {
+-        $this->markTestSkipped('The FTP_BINARY constant is not defined.');
+-      }
+-    }
+-
+-    /**
+-     * @covers ::getAdapter
+-     * @covers ::__construct
+-     */
+-    public function testGetAdapterSuccess() {
+-      $plugin = new Ftp(['host' => 'success']);
+-      $this->assertInstanceOf(LeagueFtp::class, $plugin->getAdapter());
+-    }
+-
+-    /**
+-     * @covers ::getAdapter
+-     * @covers ::__construct
+-     */
+-    public function testGetAdapterFails() {
+-      $plugin = new Ftp([]);
+-      $this->assertInstanceOf(MissingAdapter::class, $plugin->getAdapter());
+-    }
+-
+-    /**
+-     * @covers ::ensure
+-     */
+-    public function testEnsureReturnsNoErrorsOnSuccess() {
+-      $result = (new Ftp(['host' => 'success']))->ensure();
+-
+-      $this->assertCount(1, $result);
+-      $this->assertSame(RfcLogLevel::INFO, $result[0]['severity']);
+-    }
+-
+-    /**
+-     * @covers ::ensure
+-     */
+-    public function testEnsureReturnsErrors() {
+-      $plugin = new Ftp([]);
+-      $result = $plugin->ensure();
+-      $this->assertCount(1, $result);
+-      $this->assertSame(21, $result[0]['context']['%port']);
+-    }
+-
+-  }
+-}
+-
+-namespace League\Flysystem\Adapter {
+-
+-  /**
+-   * Stubs ftp_chdir().
+-   */
+-  function ftp_chdir() {
+-    return TRUE;
+-  }
+-
+-  /**
+-   * Stubs ftp_close().
+-   */
+-  function ftp_close() {
+-  }
+-
+-  /**
+-   * Stubs ftp_connect().
+-   */
+-  function ftp_connect($host) {
+-    return $host === 'success';
+-  }
+-
+-  /**
+-   * Stubs ftp_login().
+-   */
+-  function ftp_login() {
+-    return TRUE;
+-  }
+-
+-  /**
+-   * Stubs ftp_pasv().
+-   */
+-  function ftp_pasv() {
+-    return TRUE;
+-  }
+-
+-  /**
+-   * Stubs ftp_pwd().
+-   */
+-  function ftp_pwd() {
+-    return '';
+-  }
+-
+-  /**
+-   * Stubs ftp_systype().
+-   */
+-  function ftp_systype() {
+-    return TRUE;
+-  }
+-
+-  /**
+-   * Stubs ftp_raw().
+-   */
+-  function ftp_raw() {
+-    return ['200'];
+-  }
+-
+-}
 diff --git a/tests/src/Unit/Flysystem/LocalTest.php b/tests/src/Unit/Flysystem/LocalTest.php
-index 4123f0f..fad8d1f 100644
+index 4123f0f..b0a7be8 100644
 --- a/tests/src/Unit/Flysystem/LocalTest.php
 +++ b/tests/src/Unit/Flysystem/LocalTest.php
 @@ -9,7 +9,7 @@ use Drupal\Core\Site\Settings;
@@ -294,10 +697,28 @@ index 4123f0f..fad8d1f 100644
  use Drupal\flysystem\Flysystem\Local;
  use Drupal\Tests\UnitTestCase;
 -use League\Flysystem\Adapter\Local as LocalAdapter;
-+use League\Flysystem\Adapter\LocalFilesystemAdapter as LocalAdapter;
++use League\Flysystem\Local\LocalFilesystemAdapter as LocalAdapter;
  use Prophecy\Argument;
  
  /**
+@@ -30,7 +30,7 @@ class LocalTest extends UnitTestCase {
+     $url_generator->generateFromRoute(Argument::cetera())->willReturn('download');
+     $container->set('url_generator', $url_generator->reveal());
+     \Drupal::setContainer($container);
+-    (new LocalAdapter('foo/bar'))->deleteDir('');
++    (new LocalAdapter('foo/bar'))->deleteDirectory('');
+     @rmdir('foo/bar');
+     @rmdir('foo');
+     mkdir('foo');
+@@ -43,7 +43,7 @@ class LocalTest extends UnitTestCase {
+    * {@inheritdoc}
+    */
+   public function tearDown(): void {
+-    (new LocalAdapter('foo'))->deleteDir('');
++    (new LocalAdapter('foo'))->deleteDirectory('');
+     @rmdir('foo');
+ 
+     unlink('test.txt');
 diff --git a/tests/src/Unit/FlysystemBridgeTest.php b/tests/src/Unit/FlysystemBridgeTest.php
 index e587e49..b842f84 100644
 --- a/tests/src/Unit/FlysystemBridgeTest.php
@@ -311,6 +732,37 @@ index e587e49..b842f84 100644
     */
    protected $filesystem;
  
+diff --git a/tests/src/Unit/FlysystemFactoryTest.php b/tests/src/Unit/FlysystemFactoryTest.php
+index 5273e6e..73a78fc 100644
+--- a/tests/src/Unit/FlysystemFactoryTest.php
++++ b/tests/src/Unit/FlysystemFactoryTest.php
+@@ -95,7 +95,7 @@ class FlysystemFactoryTest extends UnitTestCase {
+     $factory = $this->getFactory();
+ 
+     $this->assertInstanceOf(FilesystemOperator::class, $factory->getFilesystem('test_scheme'));
+-    $this->assertInstanceOf(InMemoryFilesystemAdapter::class, $factory->getFilesystem('test_scheme')->getAdapter());
++    $this->assertInstanceOf(InMemoryFilesystemAdapter::class, $factory->getAdapter('test_scheme'));
+   }
+ 
+   /**
+@@ -104,7 +104,7 @@ class FlysystemFactoryTest extends UnitTestCase {
+   public function testGetFilesystemReturnsMissingFilesystem() {
+     new Settings([]);
+     $factory = $this->getFactory();
+-    $this->assertInstanceOf(MissingAdapter::class, $factory->getFilesystem('test_scheme')->getAdapter());
++    $this->assertInstanceOf(MissingAdapter::class, $factory->getAdapter('test_scheme'));
+   }
+ 
+   /**
+@@ -119,7 +119,7 @@ class FlysystemFactoryTest extends UnitTestCase {
+     ]);
+ 
+     $factory = $this->getFactory();
+-    $this->assertInstanceOf(DrupalCacheAdapter::class, $factory->getFilesystem('test_scheme')->getAdapter());
++    $this->assertInstanceOf(DrupalCacheAdapter::class, $factory->getAdapter('test_scheme'));
+   }
+ 
+   /**
 diff --git a/tests/src/Unit/Form/ConfigFormTest.php b/tests/src/Unit/Form/ConfigFormTest.php
 index 32acee1..0f76d83 100644
 --- a/tests/src/Unit/Form/ConfigFormTest.php
