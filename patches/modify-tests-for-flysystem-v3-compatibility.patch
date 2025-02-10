@@ -157,7 +157,7 @@ index 9d71db4..59a0703 100644
    }
  
 diff --git a/tests/src/Unit/Flysystem/Adapter/DrupalCacheAdapterTest.php b/tests/src/Unit/Flysystem/Adapter/DrupalCacheAdapterTest.php
-index c8f8c40..0f4c72b 100644
+index c8f8c40..3eeb676 100644
 --- a/tests/src/Unit/Flysystem/Adapter/DrupalCacheAdapterTest.php
 +++ b/tests/src/Unit/Flysystem/Adapter/DrupalCacheAdapterTest.php
 @@ -7,8 +7,9 @@ use Drupal\Core\Cache\MemoryBackend;
@@ -180,7 +180,7 @@ index c8f8c40..0f4c72b 100644
  
    /**
     * The main test file.
-@@ -70,146 +71,199 @@ class DrupalCacheAdapterTest extends UnitTestCase {
+@@ -70,146 +71,193 @@ class DrupalCacheAdapterTest extends UnitTestCase {
     * Tests creating a public file.
     */
    public function testWriteSuccess() {
@@ -196,13 +196,7 @@ index c8f8c40..0f4c72b 100644
 +    $config = new Config([]);
 +    // Test Cache adapter write does not fail.
 +    try {
-+      try {
-+        $this->cacheAdapter->write(static::FILE, 'contents', $config);
-+      }
-+      catch (\Throwable $e) {
-+        $this->fail();
-+      }
-+      $this->assertTrue(TRUE);
++      $this->cacheAdapter->write(static::FILE, 'contents', $config);
 +    }
 +    catch (\Throwable $e) {
 +      $this->fail();
@@ -482,7 +476,7 @@ index c8f8c40..0f4c72b 100644
      $this->assertFalse($this->cacheItemBackend->has('test_dir/test.txt'));
      $this->assertFalse($this->cacheItemBackend->has('test_dir'));
    }
-@@ -218,14 +272,22 @@ class DrupalCacheAdapterTest extends UnitTestCase {
+@@ -218,14 +266,22 @@ class DrupalCacheAdapterTest extends UnitTestCase {
     * Tests visibility checking on private files.
     */
    public function testSetVisibilitySuccess() {
@@ -512,7 +506,7 @@ index c8f8c40..0f4c72b 100644
    }
  
    /**
-@@ -234,98 +296,97 @@ class DrupalCacheAdapterTest extends UnitTestCase {
+@@ -234,98 +290,97 @@ class DrupalCacheAdapterTest extends UnitTestCase {
    public function testHasSuccess() {
      $cache_item = $this->cacheItemBackend->load(static::FILE);
      $this->cacheItemBackend->set(static::FILE, $cache_item);
