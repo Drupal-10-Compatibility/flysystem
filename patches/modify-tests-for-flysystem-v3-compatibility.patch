@@ -61,6 +61,66 @@ index 95db7e6..936c12e 100644
      <!-- <log type="coverage-clover" target="coverage.xml" showUncoveredFiles="true"/> -->
    </logging>
  </phpunit>
+diff --git a/src/Flysystem/Adapter/DrupalCacheAdapter.php b/src/Flysystem/Adapter/DrupalCacheAdapter.php
+index 1ff2cc3..c9b9840 100644
+--- a/src/Flysystem/Adapter/DrupalCacheAdapter.php
++++ b/src/Flysystem/Adapter/DrupalCacheAdapter.php
+@@ -89,30 +89,6 @@ class DrupalCacheAdapter implements FilesystemAdapter {
+     }
+   }
+ 
+-  /**
+-   * This method was deprecated for Flysystem v3.
+-   *
+-   * Leaving here for now for backwards compatibility, will need to refactor to
+-   * replace calls to update / updateStream before finalizing an alpha release
+-   * of v3.0.x.
+-   *
+-   * Also, since it has been deprecated, making this a protected function.
+-   *
+-   * @todo Refactor module to remove calls to ::update() before alpha release.
+-   */
+-  protected function update($path, $contents, Config $config): void {
+-    $this->write($path, $contents, $config);
+-  }
+-
+-  /**
+-   * This method was deprecated for Flysystem v3.
+-   *
+-   * @todo see ::update() for notes on refactoring.
+-   */
+-  public function updateStream($path, $resource, Config $config): void {
+-    $this->writeStream($path, $resource, $config);
+-  }
+-
+   /**
+    * {@inheritdoc}
+    */
+@@ -260,10 +236,7 @@ class DrupalCacheAdapter implements FilesystemAdapter {
+     if ($this->cacheItemBackend->has($path)) {
+       return TRUE;
+     }
+-
+-    // Always check the upstream adapter for new files.
+-    // @todo This could be a good place for a micro-cache?
+-    return $this->adapter->has($path);
++    return FALSE;
+   }
+ 
+   /**
+@@ -383,10 +356,10 @@ class DrupalCacheAdapter implements FilesystemAdapter {
+       // FileAttributes object.
+       'type' => $entity->type(),
+       'path' => $path,
+-      'timestamp' => $this->adapter->lastModified($path),
++      'timestamp' => $entity->lastModified(),
+     ];
+     if ($metadata['type'] == 'file') {
+-      $metadata['size'] = $this->adapter->fileSize($path);
++      $metadata['size'] = $entity->fileSize();
+     }
+ 
+     if (!empty($metadata)) {
 diff --git a/src/FlysystemBridge.php b/src/FlysystemBridge.php
 index 4bf73ce..7131bfb 100644
 --- a/src/FlysystemBridge.php
@@ -75,18 +135,23 @@ index 4bf73ce..7131bfb 100644
  /**
   * An adapter for Flysystem to StreamWrapperInterface.
 diff --git a/src/Form/ConfigForm.php b/src/Form/ConfigForm.php
-index 9d71db4..365bf46 100644
+index 9d71db4..17db1c2 100644
 --- a/src/Form/ConfigForm.php
 +++ b/src/Form/ConfigForm.php
-@@ -228,7 +228,7 @@ class ConfigForm extends FormBase {
+@@ -227,11 +227,10 @@ class ConfigForm extends FormBase {
+    */
    protected function getFileList($scheme) {
      $filesystem = $this->factory->getFilesystem($scheme);
- 
+-
 -    $files = array_filter($filesystem->listContents('', TRUE), function ($meta) {
-+    $files = array_filter($filesystem->listContents('', TRUE)->toArray(), function ($meta) {
++    $listing = $filesystem->listContents('', TRUE)->toArray();
++    $files = array_filter($listing, function ($meta) {
        return $meta['type'] === 'file';
      });
- 
+-
+     return array_map(function (array $meta) {
+       return $meta['path'];
+     }, $files);
 diff --git a/tests/src/Unit/Flysystem/Adapter/DrupalCacheAdapterTest.php b/tests/src/Unit/Flysystem/Adapter/DrupalCacheAdapterTest.php
 index c8f8c40..0f4c72b 100644
 --- a/tests/src/Unit/Flysystem/Adapter/DrupalCacheAdapterTest.php
