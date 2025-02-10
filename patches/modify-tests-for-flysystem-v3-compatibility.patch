@@ -1,3 +1,79 @@
+diff --git a/flysystem.install b/flysystem.install
+index 421ddf6..12197f0 100644
+--- a/flysystem.install
++++ b/flysystem.install
+@@ -57,7 +57,7 @@ function __flysystem_validate_schemes(array &$requirements) {
+ function __flysystem_check_dependencies(array &$requirements) {
+   $dependencies = [
+     'League\Flysystem\Filesystem' => \Drupal::translation()->translate('Flysystem'),
+-    'Codementality\FlysystemStreamWrapper\Flysystem\StreamWrapper' => \Drupal::translation()->translate('stream wrapper'),
++    'DrupalLibraries\Flystream\StreamWrapper' => \Drupal::translation()->translate('stream wrapper'),
+   ];
+ 
+   $missing = array_filter(array_map(function ($dependency) use ($dependencies) {
+diff --git a/phpunit.xml.dist b/phpunit.xml.dist
+index 95db7e6..936c12e 100644
+--- a/phpunit.xml.dist
++++ b/phpunit.xml.dist
+@@ -1,6 +1,21 @@
+ <?xml version="1.0" encoding="UTF-8"?>
+-
+-<phpunit bootstrap="tests/bootstrap.php" colors="true">
++<phpunit xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" bootstrap="tests/bootstrap.php" colors="true" xsi:noNamespaceSchemaLocation="https://schema.phpunit.de/9.3/phpunit.xsd">
++  <coverage>
++    <include>
++      <directory>./</directory>
++      <directory suffix=".module">./</directory>
++      <directory suffix=".install">./</directory>
++    </include>
++    <exclude>
++      <directory suffix="Test.php">./</directory>
++      <directory suffix="TestBase.php">./</directory>
++      <directory suffix="bootstrap.php">./</directory>
++    </exclude>
++    <report>
++      <html outputDirectory="coverage"/>
++      <text outputFile="php://stdout" showUncoveredFiles="true"/>
++    </report>
++  </coverage>
+   <php>
+     <!-- Set error reporting to E_ALL. -->
+     <ini name="error_reporting" value="32767"/>
+@@ -11,21 +26,7 @@
+     </testsuite>
+   </testsuites>
+   <!-- Filter for coverage reports. -->
+-  <filter>
+-    <whitelist>
+-      <directory>./</directory>
+-      <directory suffix=".module">./</directory>
+-      <directory suffix=".install">./</directory>
+-      <exclude>
+-        <directory suffix="Test.php">./</directory>
+-        <directory suffix="TestBase.php">./</directory>
+-        <directory suffix="bootstrap.php">./</directory>
+-      </exclude>
+-    </whitelist>
+-  </filter>
+   <logging>
+-    <log type="coverage-text" target="php://stdout" showUncoveredFiles="true"/>
+-    <log type="coverage-html" target="coverage" showUncoveredFiles="true"/>
+     <!-- <log type="coverage-clover" target="coverage.xml" showUncoveredFiles="true"/> -->
+   </logging>
+ </phpunit>
+diff --git a/src/FlysystemBridge.php b/src/FlysystemBridge.php
+index 4bf73ce..7131bfb 100644
+--- a/src/FlysystemBridge.php
++++ b/src/FlysystemBridge.php
+@@ -7,7 +7,7 @@ use Drupal\Core\StringTranslation\StringTranslationTrait;
+ use League\Flysystem\FilesystemOperator;
+ use Drupal\flysystem\Plugin\FlysystemUrlTrait;
+ use Drupal\flysystem\Utilities\Util;
+-use Codementality\FlysystemStreamWrapper\Flysystem\StreamWrapper as FlysystemStreamWrapper;
++use DrupalLibraries\Flystream\StreamWrapper as FlysystemStreamWrapper;
+ 
+ /**
+  * An adapter for Flysystem to StreamWrapperInterface.
 diff --git a/src/Form/ConfigForm.php b/src/Form/ConfigForm.php
 index 9d71db4..365bf46 100644
 --- a/src/Form/ConfigForm.php

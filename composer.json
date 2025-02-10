@@ -12,6 +12,19 @@
         {
             "type": "composer",
             "url": "https://asset-packagist.org"
+        },
+        {
+            "type": "package",
+            "package": {
+                "name": "drupal-libraries/flystream",
+                "version": "3.x-dev",
+                "type": "library",
+                "source": {
+                    "url": "https://github.com/drupal-libraries/flystream",
+                    "type": "git",
+                    "reference": "3.x-dev#1f7e2f1"
+                }
+            }
         }
     ],
     "require": {
@@ -23,6 +36,7 @@
         "drupal/flysystem": "3.0.x-dev",
         "drush/drush": "^13.3",
         "league/flysystem": "^3.1",
+        "drupal-libraries/flystream": "3.x-dev#1f7e2f1",
         "mglaman/composer-drupal-lenient": "^1.0",
         "oomphinc/composer-installers-extender": "^2.0",
         "wikimedia/composer-merge-plugin": "^2.0"
@@ -34,6 +48,11 @@
         "phpcompatibility/php-compatibility": "8.1.0",
         "phpspec/prophecy": "~1.0",
         "phpstan/phpstan-deprecation-rules": "^1.0"
+    },
+    "autoload": {
+        "psr-4": {
+            "DrupalLibraries\\Flystream\\": "vendor/drupal-libraries/flystream/src"
+        }
     },
     "conflict": {
         "drupal/drupal": "*"
