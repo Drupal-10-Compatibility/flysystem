@@ -1,0 +1,6 @@
+#!/bin/bash
+## Description: Fix Drupal coding-standards violations using phpcbf (run `ddev install` first)
+## Usage: cs-fixes
+## Example: "ddev cs-fixes"
+
+/var/www/html/vendor/bin/phpcbf -p $DDEV_DOCROOT/modules/contrib/$PROJECT_NAME

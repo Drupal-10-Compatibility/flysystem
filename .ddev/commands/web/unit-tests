@@ -11,5 +11,6 @@ projects=( "${projects[@]/$delete}" )
 ## Enable the projects stored in the $PROJECT_NAMES environment variable.
 for i in "${projects[@]}"
 do
+  /var/www/html/vendor/bin/phpunit -c /var/www/html/$DDEV_DOCROOT/modules/contrib/$i/phpunit.xml.dist --migrate-configuration
   /var/www/html/vendor/bin/phpunit -c /var/www/html/$DDEV_DOCROOT/modules/contrib/$i/phpunit.xml.dist --group=$i /var/www/html/$DDEV_DOCROOT/modules/contrib/$i
 done
