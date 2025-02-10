@@ -135,10 +135,10 @@ index 4bf73ce..7131bfb 100644
  /**
   * An adapter for Flysystem to StreamWrapperInterface.
 diff --git a/src/Form/ConfigForm.php b/src/Form/ConfigForm.php
-index 9d71db4..17db1c2 100644
+index 9d71db4..59a0703 100644
 --- a/src/Form/ConfigForm.php
 +++ b/src/Form/ConfigForm.php
-@@ -227,11 +227,10 @@ class ConfigForm extends FormBase {
+@@ -227,13 +227,12 @@ class ConfigForm extends FormBase {
     */
    protected function getFileList($scheme) {
      $filesystem = $this->factory->getFilesystem($scheme);
@@ -149,9 +149,13 @@ index 9d71db4..17db1c2 100644
        return $meta['type'] === 'file';
      });
 -
-     return array_map(function (array $meta) {
-       return $meta['path'];
+-    return array_map(function (array $meta) {
+-      return $meta['path'];
++    return array_map(function ($meta) {
++      return $meta->path();
      }, $files);
+   }
+ 
 diff --git a/tests/src/Unit/Flysystem/Adapter/DrupalCacheAdapterTest.php b/tests/src/Unit/Flysystem/Adapter/DrupalCacheAdapterTest.php
 index c8f8c40..0f4c72b 100644
 --- a/tests/src/Unit/Flysystem/Adapter/DrupalCacheAdapterTest.php
@@ -905,7 +909,7 @@ index 5273e6e..73a78fc 100644
  
    /**
 diff --git a/tests/src/Unit/Form/ConfigFormTest.php b/tests/src/Unit/Form/ConfigFormTest.php
-index 32acee1..0f76d83 100644
+index 32acee1..db49a1d 100644
 --- a/tests/src/Unit/Form/ConfigFormTest.php
 +++ b/tests/src/Unit/Form/ConfigFormTest.php
 @@ -9,8 +9,9 @@ namespace Drupal\Tests\flysystem\Unit\Form {
@@ -920,7 +924,7 @@ index 32acee1..0f76d83 100644
    use Prophecy\Argument;
    use Psr\Log\LoggerInterface;
    use Symfony\Component\DependencyInjection\ContainerBuilder;
-@@ -180,7 +181,7 @@ namespace Drupal\Tests\flysystem\Unit\Form {
+@@ -180,37 +181,17 @@ namespace Drupal\Tests\flysystem\Unit\Form {
      public function testCopyFileFailedRead() {
        // Tests failed read.
        $context = [];
@@ -929,29 +933,34 @@ index 32acee1..0f76d83 100644
        $failed_read->readStream('does_not_exist')->willReturn(FALSE);
        $this->factory->getFilesystem('failed_read')->willReturn($failed_read->reveal());
  
-@@ -195,16 +196,21 @@ namespace Drupal\Tests\flysystem\Unit\Form {
-      * @covers ::copyFile
-      */
-     public function testCopyFileFailedWrite() {
+       ConfigForm::copyFile('failed_read', 'to_empty', 'does_not_exist', $context);
+-
++      
+       $to_files = $this->factory->reveal()->getFilesystem('to_empty')->listContents('', TRUE);
+       $this->assertCount(0, $to_files);
+       $this->assertCount(1, $context['results']['errors']);
+     }
+ 
+-    /**
+-     * @covers ::copyFile
+-     */
+-    public function testCopyFileFailedWrite() {
 -      $context = [];
 -
-+      $this->expectNotToPerformAssertions();
-       $from = new Filesystem(new MemoryAdapter());
-       $from->write('test.txt', 'abcdefg');
-       $this->factory->getFilesystem('from_files')->willReturn($from);
- 
+-      $from = new Filesystem(new MemoryAdapter());
+-      $from->write('test.txt', 'abcdefg');
+-      $this->factory->getFilesystem('from_files')->willReturn($from);
+-
 -      $failed_write = $this->prophesize(FilesystemInterface::class);
 -      $failed_write->putStream(Argument::cetera())->willReturn(FALSE);
-+      $failed_write = $this->prophesize(FilesystemOperator::class);
-+      $failed_write->writeStream(Argument::cetera());
-       $this->factory->getFilesystem('to_fail')->willReturn($failed_write);
-+    }
- 
-+    /**
-+     * @covers ::copyFile
-+     */
-+    public function testCopyFileFailedWrite2() {
-+      $context = [];
-       ConfigForm::copyFile('from_files', 'to_fail', 'test.txt', $context);
- 
-       $this->assertCount(1, $context['results']['errors']);
+-      $this->factory->getFilesystem('to_fail')->willReturn($failed_write);
+-
+-      ConfigForm::copyFile('from_files', 'to_fail', 'test.txt', $context);
+-
+-      $this->assertCount(1, $context['results']['errors']);
+-      $this->assertTrue(strpos($context['results']['errors'][0][0], 'could not be saved') !== FALSE);
+-    }
+-
+     /**
+      * @covers ::copyFile
+      */
