@@ -62,10 +62,19 @@ index 95db7e6..936c12e 100644
    </logging>
  </phpunit>
 diff --git a/src/Flysystem/Adapter/DrupalCacheAdapter.php b/src/Flysystem/Adapter/DrupalCacheAdapter.php
-index 1ff2cc3..c9b9840 100644
+index 1ff2cc3..0e423eb 100644
 --- a/src/Flysystem/Adapter/DrupalCacheAdapter.php
 +++ b/src/Flysystem/Adapter/DrupalCacheAdapter.php
-@@ -89,30 +89,6 @@ class DrupalCacheAdapter implements FilesystemAdapter {
+@@ -60,8 +60,6 @@ class DrupalCacheAdapter implements FilesystemAdapter {
+   public function write(string $path, string $contents, Config $config): void {
+     try {
+       $this->adapter->write($path, $contents, $config);
+-      // @todo See ::updateMetadata for additional refactoring on
+-      // updating metadata for caching.
+       $this->updateMetadata($path);
+     }
+     catch (FilesystemException $exception) {
+@@ -89,30 +87,6 @@ class DrupalCacheAdapter implements FilesystemAdapter {
      }
    }
  
@@ -96,7 +105,7 @@ index 1ff2cc3..c9b9840 100644
    /**
     * {@inheritdoc}
     */
-@@ -260,10 +236,7 @@ class DrupalCacheAdapter implements FilesystemAdapter {
+@@ -260,10 +234,7 @@ class DrupalCacheAdapter implements FilesystemAdapter {
      if ($this->cacheItemBackend->has($path)) {
        return TRUE;
      }
@@ -108,7 +117,7 @@ index 1ff2cc3..c9b9840 100644
    }
  
    /**
-@@ -383,10 +356,10 @@ class DrupalCacheAdapter implements FilesystemAdapter {
+@@ -383,15 +354,15 @@ class DrupalCacheAdapter implements FilesystemAdapter {
        // FileAttributes object.
        'type' => $entity->type(),
        'path' => $path,
@@ -121,6 +130,25 @@ index 1ff2cc3..c9b9840 100644
      }
  
      if (!empty($metadata)) {
+       $item = $this->cacheItemBackend->load($path);
+-      $item->updateMetadata($path);
++      $item->updateMetadata($metadata);
+       $this->cacheItemBackend->set($path, $item);
+     }
+   }
+diff --git a/src/Flysystem/Adapter/MissingAdapter.php b/src/Flysystem/Adapter/MissingAdapter.php
+index 6f8a042..fa4d0d3 100644
+--- a/src/Flysystem/Adapter/MissingAdapter.php
++++ b/src/Flysystem/Adapter/MissingAdapter.php
+@@ -78,7 +78,7 @@ class MissingAdapter implements FilesystemAdapter {
+    * {@inheritdoc}
+    */
+   public function visibility($path): FileAttributes {
+-    return Visibility::PRIVATE;
++    return new FileAttributes($path, NULL, Visibility::PRIVATE, NULL, NULL);
+   }
+ 
+   /**
 diff --git a/src/FlysystemBridge.php b/src/FlysystemBridge.php
 index 4bf73ce..7131bfb 100644
 --- a/src/FlysystemBridge.php
@@ -157,7 +185,7 @@ index 9d71db4..59a0703 100644
    }
  
 diff --git a/tests/src/Unit/Flysystem/Adapter/DrupalCacheAdapterTest.php b/tests/src/Unit/Flysystem/Adapter/DrupalCacheAdapterTest.php
-index c8f8c40..3eeb676 100644
+index c8f8c40..10066c9 100644
 --- a/tests/src/Unit/Flysystem/Adapter/DrupalCacheAdapterTest.php
 +++ b/tests/src/Unit/Flysystem/Adapter/DrupalCacheAdapterTest.php
 @@ -7,8 +7,9 @@ use Drupal\Core\Cache\MemoryBackend;
@@ -180,7 +208,7 @@ index c8f8c40..3eeb676 100644
  
    /**
     * The main test file.
-@@ -70,146 +71,193 @@ class DrupalCacheAdapterTest extends UnitTestCase {
+@@ -70,146 +71,195 @@ class DrupalCacheAdapterTest extends UnitTestCase {
     * Tests creating a public file.
     */
    public function testWriteSuccess() {
@@ -193,13 +221,15 @@ index c8f8c40..3eeb676 100644
 -    $this->assertSame('public', $metadata['visibility']);
 -    $this->assertSame('public', $this->cacheAdapter->getVisibility(static::FILE)['visibility']);
 -    $this->assertTrue($this->cacheItemBackend->has(static::FILE));
-+    $config = new Config([]);
 +    // Test Cache adapter write does not fail.
 +    try {
-+      $this->cacheAdapter->write(static::FILE, 'contents', $config);
++      $this->cacheAdapter->write(static::FILE, 'contents', new Config());
 +    }
-+    catch (\Throwable $e) {
-+      $this->fail();
++    catch (FilesystemException $exception) {
++      // @todo Log exception to logs,need to implement logger
++      // @todo Display user friendly error message
++      // @todo The following exception throw is temporary
++      throw new \Exception('File could not be saved.');
 +    }
 +
 +    // Test file visibility.
@@ -476,7 +506,7 @@ index c8f8c40..3eeb676 100644
      $this->assertFalse($this->cacheItemBackend->has('test_dir/test.txt'));
      $this->assertFalse($this->cacheItemBackend->has('test_dir'));
    }
-@@ -218,14 +266,22 @@ class DrupalCacheAdapterTest extends UnitTestCase {
+@@ -218,14 +268,22 @@ class DrupalCacheAdapterTest extends UnitTestCase {
     * Tests visibility checking on private files.
     */
    public function testSetVisibilitySuccess() {
@@ -506,7 +536,7 @@ index c8f8c40..3eeb676 100644
    }
  
    /**
-@@ -234,98 +290,97 @@ class DrupalCacheAdapterTest extends UnitTestCase {
+@@ -234,98 +292,97 @@ class DrupalCacheAdapterTest extends UnitTestCase {
    public function testHasSuccess() {
      $cache_item = $this->cacheItemBackend->load(static::FILE);
      $this->cacheItemBackend->set(static::FILE, $cache_item);
@@ -658,41 +688,48 @@ index c8f8c40..3eeb676 100644
  
  }
 diff --git a/tests/src/Unit/Flysystem/Adapter/MissingAdapterTest.php b/tests/src/Unit/Flysystem/Adapter/MissingAdapterTest.php
-index 7bae52f..7a85d83 100644
+index 7bae52f..c225b32 100644
 --- a/tests/src/Unit/Flysystem/Adapter/MissingAdapterTest.php
 +++ b/tests/src/Unit/Flysystem/Adapter/MissingAdapterTest.php
-@@ -18,25 +18,21 @@ class MissingAdapterTest extends UnitTestCase {
+@@ -17,26 +17,21 @@ class MissingAdapterTest extends UnitTestCase {
+    */
    public function test() {
      $adapter = new MissingAdapter();
- 
+-
 -    $this->assertFalse($adapter->copy('', ''));
 -    $this->assertFalse($adapter->createDir('', new Config()));
 -    $this->assertFalse($adapter->delete(''));
 -    $this->assertFalse($adapter->deleteDir(''));
 -    $this->assertIsArray($adapter->listContents(''));
 -    $this->assertFalse($adapter->getMetadata(''));
-+    $this->assertFalse($adapter->copy('', '', new Config([])));
-+    $this->assertFalse($adapter->createDirectory('', new Config([])));
-+    $this->assertFalse($adapter->delete('', new Config([])));
-+    $this->assertFalse($adapter->deleteDirectory('', new Config([])));
-+    $this->assertIsArray($adapter->listContents('', new Config([])));
-     $this->assertFalse($adapter->getMimetype(''));
-     $this->assertFalse($adapter->getSize(''));
-     $this->assertFalse($adapter->getTimestamp(''));
-     $this->assertFalse($adapter->getVisibility(''));
+-    $this->assertFalse($adapter->getMimetype(''));
+-    $this->assertFalse($adapter->getSize(''));
+-    $this->assertFalse($adapter->getTimestamp(''));
+-    $this->assertFalse($adapter->getVisibility(''));
 -    $this->assertFalse($adapter->has(''));
-     $this->assertFalse($adapter->setVisibility('', 'public'));
+-    $this->assertFalse($adapter->setVisibility('', 'public'));
 -    $this->assertFalse($adapter->update('', '', new Config()));
 -    $this->assertFalse($adapter->updateStream('', NULL, new Config()));
 -    $this->assertFalse($adapter->read(''));
 -    $this->assertFalse($adapter->readStream(''));
-+    $this->assertFalse($adapter->read('', new Config([])));
-+    $this->assertFalse($adapter->readStream('', new Config([])));
-     $this->assertFalse($adapter->rename('', ''));
+-    $this->assertFalse($adapter->rename('', ''));
 -    $this->assertFalse($adapter->write('', '', new Config()));
 -    $this->assertFalse($adapter->writeStream('', NULL, new Config()));
-+    $this->assertFalse($adapter->write('', '', new Config([])));
-+    $this->assertFalse($adapter->writeStream('', NULL, new Config([])));
++    $this->assertNull($adapter->copy('', '', new Config([])));
++    $this->assertNull($adapter->createDirectory('', new Config([])));
++    $this->assertNull($adapter->delete('', new Config([])));
++    $this->assertNull($adapter->deleteDirectory('', new Config([])));
++    $this->assertIsArray($adapter->listContents('', new Config([])));
++    $this->assertEquals($adapter->mimeType('')->mimeType(), 'plain/text');
++    $this->assertEquals($adapter->fileSize('')->fileSize(), 1234);
++    $this->assertEquals($adapter->lastModified('')->lastModified(), time());
++    $this->assertEquals($adapter->visibility('')->visibility(), 'private');
++    $this->assertNULL($adapter->setVisibility('', 'public'));
++    $this->assertEquals($adapter->read('', new Config([])), '');
++    $this->assertEquals($adapter->readStream('', new Config([])), '');
++    $this->assertNull($adapter->move('', ''));
++    $this->assertNull($adapter->write('', '', new Config([])));
++    $this->assertNull($adapter->writeStream('', NULL, new Config([])));
    }
  
  }
