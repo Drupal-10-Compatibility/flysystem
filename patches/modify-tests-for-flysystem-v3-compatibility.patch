@@ -903,7 +903,7 @@ index 5273e6e..73a78fc 100644
  
    /**
 diff --git a/tests/src/Unit/Form/ConfigFormTest.php b/tests/src/Unit/Form/ConfigFormTest.php
-index 32acee1..db49a1d 100644
+index 32acee1..a22658f 100644
 --- a/tests/src/Unit/Form/ConfigFormTest.php
 +++ b/tests/src/Unit/Form/ConfigFormTest.php
 @@ -9,8 +9,9 @@ namespace Drupal\Tests\flysystem\Unit\Form {
@@ -958,3 +958,12 @@ index 32acee1..db49a1d 100644
      /**
       * @covers ::copyFile
       */
+@@ -219,7 +200,7 @@ namespace Drupal\Tests\flysystem\Unit\Form {
+       ConfigForm::copyFile('from_empty', 'to_empty', 'does_not_exist.txt', $context);
+       $this->assertCount(2, $context['results']['errors']);
+       $this->assertTrue(strpos($context['results']['errors'][0][0], 'An error occurred while copying') !== FALSE);
+-      $this->assertTrue(strpos($context['results']['errors'][1], 'File not found at path') !== FALSE);
++      $this->assertTrue(strpos($context['results']['errors'][1], 'Unable to read file from location: /does_not_exist.txt. file does not exist') !== FALSE);
+     }
+ 
+     /**
