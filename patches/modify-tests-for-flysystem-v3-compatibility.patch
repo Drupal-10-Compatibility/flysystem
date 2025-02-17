@@ -61,8 +61,20 @@ index 95db7e6..936c12e 100644
      <!-- <log type="coverage-clover" target="coverage.xml" showUncoveredFiles="true"/> -->
    </logging>
  </phpunit>
+diff --git a/src/Event/FlysystemEvents.php b/src/Event/FlysystemEvents.php
+index f21fc6a..fe79a7e 100644
+--- a/src/Event/FlysystemEvents.php
++++ b/src/Event/FlysystemEvents.php
+@@ -10,6 +10,6 @@ final class FlysystemEvents {
+   /**
+    * Fired when FlysystemFactory::ensure() is called.
+    */
+-  const ENSURE = 'feeds.ensure';
++  const ENSURE = 'flysystem.ensure';
+ 
+ }
 diff --git a/src/Flysystem/Adapter/DrupalCacheAdapter.php b/src/Flysystem/Adapter/DrupalCacheAdapter.php
-index 1ff2cc3..0e423eb 100644
+index 1ff2cc3..3e4de6e 100644
 --- a/src/Flysystem/Adapter/DrupalCacheAdapter.php
 +++ b/src/Flysystem/Adapter/DrupalCacheAdapter.php
 @@ -60,8 +60,6 @@ class DrupalCacheAdapter implements FilesystemAdapter {
@@ -117,18 +129,19 @@ index 1ff2cc3..0e423eb 100644
    }
  
    /**
-@@ -383,15 +354,15 @@ class DrupalCacheAdapter implements FilesystemAdapter {
+@@ -383,15 +354,16 @@ class DrupalCacheAdapter implements FilesystemAdapter {
        // FileAttributes object.
        'type' => $entity->type(),
        'path' => $path,
 -      'timestamp' => $this->adapter->lastModified($path),
 +      'timestamp' => $entity->lastModified(),
++      //'timestamp' => $this->adapter->lastModified($path),
      ];
      if ($metadata['type'] == 'file') {
--      $metadata['size'] = $this->adapter->fileSize($path);
-+      $metadata['size'] = $entity->fileSize();
++      //$metadata['size'] = $entity->fileSize();
+       $metadata['size'] = $this->adapter->fileSize($path);
      }
- 
+-
      if (!empty($metadata)) {
        $item = $this->cacheItemBackend->load($path);
 -      $item->updateMetadata($path);
@@ -865,7 +878,7 @@ index a4063b4..0000000
 -
 -}
 diff --git a/tests/src/Unit/Flysystem/LocalTest.php b/tests/src/Unit/Flysystem/LocalTest.php
-index 4123f0f..b0a7be8 100644
+index 4123f0f..50bcd66 100644
 --- a/tests/src/Unit/Flysystem/LocalTest.php
 +++ b/tests/src/Unit/Flysystem/LocalTest.php
 @@ -9,7 +9,7 @@ use Drupal\Core\Site\Settings;
@@ -877,24 +890,160 @@ index 4123f0f..b0a7be8 100644
  use Prophecy\Argument;
  
  /**
-@@ -30,7 +30,7 @@ class LocalTest extends UnitTestCase {
+@@ -24,32 +24,32 @@ class LocalTest extends UnitTestCase {
+   public function setUp(): void {
+     parent::setUp();
+     $GLOBALS['base_url'] = 'http://example.com';
+-
++    $GLOBALS['FILES_DIRECTORY'] = 'sites/default/files/testing/';
+     $container = new ContainerBuilder();
+     $url_generator = $this->prophesize(UrlGeneratorInterface::class);
      $url_generator->generateFromRoute(Argument::cetera())->willReturn('download');
      $container->set('url_generator', $url_generator->reveal());
      \Drupal::setContainer($container);
 -    (new LocalAdapter('foo/bar'))->deleteDir('');
-+    (new LocalAdapter('foo/bar'))->deleteDirectory('');
-     @rmdir('foo/bar');
-     @rmdir('foo');
-     mkdir('foo');
-@@ -43,7 +43,7 @@ class LocalTest extends UnitTestCase {
+-    @rmdir('foo/bar');
+-    @rmdir('foo');
+-    mkdir('foo');
+-    mkdir('foo/bar');
+-
+-    touch('test.txt');
++    (new LocalAdapter($GLOBALS['FILES_DIRECTORY'] . 'foo/bar'))->deleteDirectory('');
++    @rmdir($GLOBALS['FILES_DIRECTORY'] . 'foo/bar');
++    @rmdir($GLOBALS['FILES_DIRECTORY'] . 'foo');
++    mkdir($GLOBALS['FILES_DIRECTORY'] . 'foo');
++    mkdir($GLOBALS['FILES_DIRECTORY'] . 'foo/bar');
++    touch($GLOBALS['FILES_DIRECTORY'] . 'test.txt');
+   }
+ 
+   /**
     * {@inheritdoc}
     */
    public function tearDown(): void {
 -    (new LocalAdapter('foo'))->deleteDir('');
-+    (new LocalAdapter('foo'))->deleteDirectory('');
-     @rmdir('foo');
+-    @rmdir('foo');
++    (new LocalAdapter($GLOBALS['FILES_DIRECTORY'] . 'foo'))->deleteDirectory('');
  
-     unlink('test.txt');
+-    unlink('test.txt');
++    unlink($GLOBALS['FILES_DIRECTORY'] . 'test.txt');
+ 
+-    @unlink('does_not_exist/.htaccess');
+-    @rmdir('does_not_exist');
++    @unlink($GLOBALS['FILES_DIRECTORY'] . 'does_not_exist/.htaccess');
++    @rmdir($GLOBALS['FILES_DIRECTORY'] . 'does_not_exist');
++    $this->delTree($GLOBALS['FILES_DIRECTORY']);
++    
+   }
+ 
+   /**
+@@ -61,7 +61,7 @@ class LocalTest extends UnitTestCase {
+     $settings = new Settings([]);
+     $container->set('settings', $settings);
+ 
+-    $configuration = ['root' => 'foo/bar'];
++    $configuration = ['root' => $GLOBALS['FILES_DIRECTORY'] . 'foo/bar'];
+ 
+     $this->assertInstanceOf(Local::class, Local::create($container, $configuration, '', []));
+   }
+@@ -71,7 +71,7 @@ class LocalTest extends UnitTestCase {
+    * @covers ::ensureDirectory
+    */
+   public function testReturnsLocalAdapter() {
+-    $this->assertInstanceOf(LocalAdapter::class, (new Local('foo/bar', FALSE))->getAdapter());
++    $this->assertInstanceOf(LocalAdapter::class, (new Local($GLOBALS['FILES_DIRECTORY'] . 'foo/bar', FALSE))->getAdapter());
+   }
+ 
+   /**
+@@ -79,14 +79,15 @@ class LocalTest extends UnitTestCase {
+    * @covers ::ensureDirectory
+    */
+   public function testMissingAdapterReturnedWhenPathIsFile() {
+-    $this->assertInstanceOf(MissingAdapter::class, (new Local('test.txt'))->getAdapter());
++
++    $this->assertInstanceOf(MissingAdapter::class, (new Local($GLOBALS['FILES_DIRECTORY'] . 'test.txt'))->getAdapter());
+   }
+ 
+   /**
+    * @covers ::getExternalUrl
+    */
+   public function testReturnsValidLocalUrl() {
+-    $plugin = new Local('foo/bar', FALSE);
++    $plugin = new Local($GLOBALS['FILES_DIRECTORY'] . 'foo/bar', FALSE);
+     $this->assertSame('download', $plugin->getExternalUrl('uri://test.html'));
+   }
+ 
+@@ -94,8 +95,8 @@ class LocalTest extends UnitTestCase {
+    * @covers ::getExternalUrl
+    */
+   public function testReturnsValidExternalUrl() {
+-    $plugin = new Local('foo/bar', TRUE);
+-    $this->assertSame('http://example.com/foo/bar/test%20thing.html', $plugin->getExternalUrl('uri://test thing.html'));
++    $plugin = new Local($GLOBALS['FILES_DIRECTORY'] . 'foo/bar', TRUE);
++    $this->assertSame('http://example.com/' . $GLOBALS['FILES_DIRECTORY'] . 'foo/bar/test%20thing.html', $plugin->getExternalUrl('uri://test thing.html'));
+   }
+ 
+   /**
+@@ -103,9 +104,9 @@ class LocalTest extends UnitTestCase {
+    * @covers ::ensureDirectory
+    */
+   public function testDirectoryIsAutoCreatedAndHtaccessIsWritten() {
+-    new Local('does_not_exist');
+-    $this->assertTrue(is_dir('does_not_exist'));
+-    $this->assertTrue(is_file('does_not_exist/.htaccess'));
++    new Local($GLOBALS['FILES_DIRECTORY'] . 'does_not_exist');
++    $this->assertTrue(is_dir($GLOBALS['FILES_DIRECTORY'] . 'does_not_exist'));
++    $this->assertTrue(is_file($GLOBALS['FILES_DIRECTORY'] . 'does_not_exist/.htaccess'));
+ 
+   }
+ 
+@@ -114,13 +115,12 @@ class LocalTest extends UnitTestCase {
+    * @covers ::writeHtaccess
+    */
+   public function testHtaccessNotOverwritten() {
+-    file_put_contents('foo/bar/.htaccess', 'htaccess content');
+-
+-    $result = (new Local('foo/bar'))->ensure();
++    file_put_contents($GLOBALS['FILES_DIRECTORY'] . 'foo/bar/.htaccess', 'htaccess content');
+ 
++    $result = (new Local($GLOBALS['FILES_DIRECTORY'] . 'foo/bar'))->ensure();
+     $this->assertCount(1, $result);
+     $this->assertSame(RfcLogLevel::INFO, $result[0]['severity']);
+-    $this->assertSame('htaccess content', file_get_contents('foo/bar/.htaccess'));
++    $this->assertSame('htaccess content', file_get_contents($GLOBALS['FILES_DIRECTORY'] . 'foo/bar/.htaccess'));
+   }
+ 
+   /**
+@@ -128,8 +128,9 @@ class LocalTest extends UnitTestCase {
+    * @covers ::writeHtaccess
+    */
+   public function testHtaccessNotOverwrittenAndFails() {
+-    mkdir('foo/bar/.htaccess', 0777, TRUE);
+-
++    @mkdir('foo');
++    @mkdir('foo/bar');
++    @mkdir('foo/bar/.htaccess', 0777, TRUE);
+     $result = (new Local('foo/bar'))->ensure(TRUE);
+     $this->assertCount(1, $result);
+     $this->assertSame('https://www.drupal.org/SA-CORE-2013-003', $result[0]['context']['@url']);
+@@ -140,8 +141,16 @@ class LocalTest extends UnitTestCase {
+    * @covers ::writeHtaccess
+    */
+   public function testEnsureReturnsErrorWhenCantCreateDir() {
+-    $result = (new Local('test.txt'))->ensure();
+-    $this->assertSame('test.txt', $result[0]['context']['%root']);
++    $result = (new Local($GLOBALS['FILES_DIRECTORY'] . 'test.txt'))->ensure();
++    $this->assertSame($GLOBALS['FILES_DIRECTORY'] . 'test.txt', $result[0]['context']['%root']);
++  }
++
++  protected function delTree($dir) {
++    $files = array_diff(scandir($dir), array('.','..'));
++    foreach ($files as $file) {
++      (is_dir("$dir/$file")) ? delTree("$dir/$file") : unlink("$dir/$file");
++    }
++    return rmdir($dir);
+   }
+ 
+ }
 diff --git a/tests/src/Unit/FlysystemBridgeTest.php b/tests/src/Unit/FlysystemBridgeTest.php
 index e587e49..b842f84 100644
 --- a/tests/src/Unit/FlysystemBridgeTest.php
@@ -940,7 +1089,7 @@ index 5273e6e..73a78fc 100644
  
    /**
 diff --git a/tests/src/Unit/Form/ConfigFormTest.php b/tests/src/Unit/Form/ConfigFormTest.php
-index 32acee1..a22658f 100644
+index 32acee1..098819c 100644
 --- a/tests/src/Unit/Form/ConfigFormTest.php
 +++ b/tests/src/Unit/Form/ConfigFormTest.php
 @@ -9,8 +9,9 @@ namespace Drupal\Tests\flysystem\Unit\Form {
@@ -955,7 +1104,7 @@ index 32acee1..a22658f 100644
    use Prophecy\Argument;
    use Psr\Log\LoggerInterface;
    use Symfony\Component\DependencyInjection\ContainerBuilder;
-@@ -180,37 +181,17 @@ namespace Drupal\Tests\flysystem\Unit\Form {
+@@ -180,7 +181,7 @@ namespace Drupal\Tests\flysystem\Unit\Form {
      public function testCopyFileFailedRead() {
        // Tests failed read.
        $context = [];
@@ -964,11 +1113,7 @@ index 32acee1..a22658f 100644
        $failed_read->readStream('does_not_exist')->willReturn(FALSE);
        $this->factory->getFilesystem('failed_read')->willReturn($failed_read->reveal());
  
-       ConfigForm::copyFile('failed_read', 'to_empty', 'does_not_exist', $context);
--
-+      
-       $to_files = $this->factory->reveal()->getFilesystem('to_empty')->listContents('', TRUE);
-       $this->assertCount(0, $to_files);
+@@ -191,26 +192,6 @@ namespace Drupal\Tests\flysystem\Unit\Form {
        $this->assertCount(1, $context['results']['errors']);
      }
  
