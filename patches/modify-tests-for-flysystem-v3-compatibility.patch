@@ -74,10 +74,10 @@ index f21fc6a..fe79a7e 100644
  
  }
 diff --git a/src/Flysystem/Adapter/DrupalCacheAdapter.php b/src/Flysystem/Adapter/DrupalCacheAdapter.php
-index 1ff2cc3..d7c77fc 100644
+index 1ff2cc3..5a54bcc 100644
 --- a/src/Flysystem/Adapter/DrupalCacheAdapter.php
 +++ b/src/Flysystem/Adapter/DrupalCacheAdapter.php
-@@ -2,18 +2,30 @@
+@@ -2,18 +2,29 @@
  
  namespace Drupal\flysystem\Flysystem\Adapter;
  
@@ -85,7 +85,7 @@ index 1ff2cc3..d7c77fc 100644
  use League\Flysystem\FilesystemAdapter;
  use League\Flysystem\Config;
  use League\Flysystem\FileAttributes;
- use League\Flysystem\FilesystemException;
+-use League\Flysystem\FilesystemException;
 +use League\Flysystem\InvalidVisibilityProvided;
 +use League\Flysystem\UnableToDeleteDirectory;
 +use League\Flysystem\UnableToDeleteFile;
@@ -108,17 +108,7 @@ index 1ff2cc3..d7c77fc 100644
    /**
     * The Flysystem adapter to cache data for.
     *
-@@ -44,7 +56,8 @@ class DrupalCacheAdapter implements FilesystemAdapter {
-    *   The flysystem adapter to cache data for.
-    * @param \Drupal\flysystem\Flysystem\Adapter\CacheItemBackend $cacheItemBackend
-    *   The cache backend to store data in.
--   *
-+   * @param \Drupal\Core\Logger\LoggerChannelInterface $logger
-+   *   The logger.
-    * @todo Evaluate whether the FilesystemAdapter should actuallly be the Filesystem instead.
-    * @see https://github.com/thephpleague/flysystem/blob/3.x/src/Filesystem.php
-    */
-@@ -60,15 +73,13 @@ class DrupalCacheAdapter implements FilesystemAdapter {
+@@ -60,15 +71,13 @@ class DrupalCacheAdapter implements FilesystemAdapter {
    public function write(string $path, string $contents, Config $config): void {
      try {
        $this->adapter->write($path, $contents, $config);
@@ -137,7 +127,7 @@ index 1ff2cc3..d7c77fc 100644
      }
    }
  
-@@ -81,38 +92,14 @@ class DrupalCacheAdapter implements FilesystemAdapter {
+@@ -81,38 +90,14 @@ class DrupalCacheAdapter implements FilesystemAdapter {
        $this->adapter->writeStream($path, $resource, $config);
        $this->updateMetadata($path);
      }
@@ -179,7 +169,7 @@ index 1ff2cc3..d7c77fc 100644
    /**
     * {@inheritdoc}
     */
-@@ -124,11 +111,11 @@ class DrupalCacheAdapter implements FilesystemAdapter {
+@@ -124,11 +109,11 @@ class DrupalCacheAdapter implements FilesystemAdapter {
        $newItem = clone $item;
        $this->cacheItemBackend->set($newPath, $newItem);
      }
@@ -194,7 +184,7 @@ index 1ff2cc3..d7c77fc 100644
      }
    }
  
-@@ -143,11 +130,11 @@ class DrupalCacheAdapter implements FilesystemAdapter {
+@@ -143,11 +128,11 @@ class DrupalCacheAdapter implements FilesystemAdapter {
        $newItem = clone $item;
        $this->cacheItemBackend->set($newPath, $newItem);
      }
@@ -209,7 +199,7 @@ index 1ff2cc3..d7c77fc 100644
      }
    }
  
-@@ -160,8 +147,11 @@ class DrupalCacheAdapter implements FilesystemAdapter {
+@@ -160,8 +145,11 @@ class DrupalCacheAdapter implements FilesystemAdapter {
        $this->cacheItemBackend->delete($path);
        // It is ok!
      }
@@ -223,7 +213,7 @@ index 1ff2cc3..d7c77fc 100644
      }
    }
  
-@@ -177,8 +167,11 @@ class DrupalCacheAdapter implements FilesystemAdapter {
+@@ -177,8 +165,11 @@ class DrupalCacheAdapter implements FilesystemAdapter {
        $paths = array_column($contents, 'path');
        $this->cacheItemBackend->deleteMultiple($paths);
      }
@@ -237,7 +227,7 @@ index 1ff2cc3..d7c77fc 100644
      }
    }
  
-@@ -192,10 +185,12 @@ class DrupalCacheAdapter implements FilesystemAdapter {
+@@ -192,10 +183,12 @@ class DrupalCacheAdapter implements FilesystemAdapter {
        $item->updateMetadata($item);
        $this->cacheItemBackend->set($dirname, $item);
      }
@@ -253,7 +243,7 @@ index 1ff2cc3..d7c77fc 100644
    }
  
    /**
-@@ -206,11 +201,11 @@ class DrupalCacheAdapter implements FilesystemAdapter {
+@@ -206,11 +199,11 @@ class DrupalCacheAdapter implements FilesystemAdapter {
        $this->adapter->setVisibility($path, $visibility);
        $this->updateMetadata($path);
      }
@@ -268,7 +258,7 @@ index 1ff2cc3..d7c77fc 100644
      }
    }
  
-@@ -219,13 +214,13 @@ class DrupalCacheAdapter implements FilesystemAdapter {
+@@ -219,13 +212,13 @@ class DrupalCacheAdapter implements FilesystemAdapter {
     */
    public function fileExists($path): bool {
      try {
@@ -285,7 +275,7 @@ index 1ff2cc3..d7c77fc 100644
      }
    }
  
-@@ -234,13 +229,13 @@ class DrupalCacheAdapter implements FilesystemAdapter {
+@@ -234,13 +227,13 @@ class DrupalCacheAdapter implements FilesystemAdapter {
     */
    public function directoryExists($path): bool {
      try {
@@ -302,7 +292,7 @@ index 1ff2cc3..d7c77fc 100644
      }
    }
  
-@@ -260,10 +255,7 @@ class DrupalCacheAdapter implements FilesystemAdapter {
+@@ -260,10 +253,7 @@ class DrupalCacheAdapter implements FilesystemAdapter {
      if ($this->cacheItemBackend->has($path)) {
        return TRUE;
      }
@@ -314,7 +304,7 @@ index 1ff2cc3..d7c77fc 100644
    }
  
    /**
-@@ -273,11 +265,11 @@ class DrupalCacheAdapter implements FilesystemAdapter {
+@@ -273,11 +263,11 @@ class DrupalCacheAdapter implements FilesystemAdapter {
      try {
        return $this->adapter->read($path);
      }
@@ -329,7 +319,7 @@ index 1ff2cc3..d7c77fc 100644
      }
    }
  
-@@ -288,11 +280,11 @@ class DrupalCacheAdapter implements FilesystemAdapter {
+@@ -288,11 +278,11 @@ class DrupalCacheAdapter implements FilesystemAdapter {
      try {
        return $this->adapter->readStream($path);
      }
@@ -344,7 +334,7 @@ index 1ff2cc3..d7c77fc 100644
      }
    }
  
-@@ -303,7 +295,15 @@ class DrupalCacheAdapter implements FilesystemAdapter {
+@@ -303,7 +293,15 @@ class DrupalCacheAdapter implements FilesystemAdapter {
      // Don't cache directory listings to avoid having to keep track of
      // incomplete cache entries.
      // @todo This could be a good place for a micro-cache?
@@ -361,7 +351,7 @@ index 1ff2cc3..d7c77fc 100644
    }
  
    /**
-@@ -315,9 +315,9 @@ class DrupalCacheAdapter implements FilesystemAdapter {
+@@ -315,9 +313,9 @@ class DrupalCacheAdapter implements FilesystemAdapter {
      }
      catch (UnableToRetrieveMetadata $exception) {
        // @todo Log exception to logs,need to implement logger
@@ -373,7 +363,7 @@ index 1ff2cc3..d7c77fc 100644
      }
    }
  
-@@ -330,9 +330,9 @@ class DrupalCacheAdapter implements FilesystemAdapter {
+@@ -330,9 +328,9 @@ class DrupalCacheAdapter implements FilesystemAdapter {
      }
      catch (UnableToRetrieveMetadata $exception) {
        // @todo Log exception to logs,need to implement logger
@@ -385,7 +375,7 @@ index 1ff2cc3..d7c77fc 100644
      }
    }
  
-@@ -345,9 +345,9 @@ class DrupalCacheAdapter implements FilesystemAdapter {
+@@ -345,9 +343,9 @@ class DrupalCacheAdapter implements FilesystemAdapter {
      }
      catch (UnableToRetrieveMetadata $exception) {
        // @todo Log exception to logs,need to implement logger
@@ -397,7 +387,7 @@ index 1ff2cc3..d7c77fc 100644
      }
    }
  
-@@ -356,13 +356,13 @@ class DrupalCacheAdapter implements FilesystemAdapter {
+@@ -356,13 +354,13 @@ class DrupalCacheAdapter implements FilesystemAdapter {
     */
    public function visibility($path): FileAttributes {
      try {
@@ -414,7 +404,7 @@ index 1ff2cc3..d7c77fc 100644
      }
    }
  
-@@ -383,15 +383,18 @@ class DrupalCacheAdapter implements FilesystemAdapter {
+@@ -383,15 +381,18 @@ class DrupalCacheAdapter implements FilesystemAdapter {
        // FileAttributes object.
        'type' => $entity->type(),
        'path' => $path,
@@ -523,22 +513,24 @@ index 9d71db4..59a0703 100644
    }
  
 diff --git a/tests/src/Unit/Flysystem/Adapter/DrupalCacheAdapterTest.php b/tests/src/Unit/Flysystem/Adapter/DrupalCacheAdapterTest.php
-index c8f8c40..e17c132 100644
+index c8f8c40..c50c6b6 100644
 --- a/tests/src/Unit/Flysystem/Adapter/DrupalCacheAdapterTest.php
 +++ b/tests/src/Unit/Flysystem/Adapter/DrupalCacheAdapterTest.php
-@@ -7,8 +7,10 @@ use Drupal\Core\Cache\MemoryBackend;
+@@ -7,8 +7,12 @@ use Drupal\Core\Cache\MemoryBackend;
  use Drupal\flysystem\Flysystem\Adapter\CacheItemBackend;
  use Drupal\flysystem\Flysystem\Adapter\DrupalCacheAdapter;
  use Drupal\Tests\UnitTestCase;
 -use League\Flysystem\FilesystemAdapter;
  use League\Flysystem\Config;
-+use League\Flysystem\FilesystemAdapter;
-+use League\Flysystem\Visibility;
 +use League\Flysystem\FileAttributes;
++use League\Flysystem\FilesystemAdapter;
++use League\Flysystem\Local\LocalFilesystemAdapter;
++use League\Flysystem\UnixVisibility\PortableVisibilityConverter;
++use League\Flysystem\Visibility;
  
  /**
   * Test the Drupal Cache Adapter.
-@@ -25,7 +27,7 @@ class DrupalCacheAdapterTest extends UnitTestCase {
+@@ -25,7 +29,7 @@ class DrupalCacheAdapterTest extends UnitTestCase {
     *
     * @var string
     */
@@ -547,7 +539,7 @@ index c8f8c40..e17c132 100644
  
    /**
     * The main test file.
-@@ -55,6 +57,11 @@ class DrupalCacheAdapterTest extends UnitTestCase {
+@@ -55,6 +59,11 @@ class DrupalCacheAdapterTest extends UnitTestCase {
     */
    protected $cacheItemBackend;
  
@@ -559,13 +551,32 @@ index c8f8c40..e17c132 100644
    /**
     * {@inheritdoc}
     */
-@@ -63,269 +70,341 @@ class DrupalCacheAdapterTest extends UnitTestCase {
+@@ -62,270 +71,358 @@ class DrupalCacheAdapterTest extends UnitTestCase {
+     parent::setUp();
      $time = $this->prophesize(TimeInterface::class)->reveal();
      $this->cacheItemBackend = new CacheItemBackend(static::SCHEME, new MemoryBackend($time));
-     $this->adapter = $this->prophesize(FilesystemAdapter::class);
-+    $this->time = time();
-+    $this->adapter->lastModified(static::FILE)->willReturn(new FileAttributes(static::FILE, NULL, NULL, $this->time, NULL));
-     $this->cacheAdapter = new DrupalCacheAdapter(static::SCHEME, $this->adapter->reveal(), $this->cacheItemBackend);
+-    $this->adapter = $this->prophesize(FilesystemAdapter::class);
+-    $this->cacheAdapter = new DrupalCacheAdapter(static::SCHEME, $this->adapter->reveal(), $this->cacheItemBackend);
++    $this->adapter = new LocalFilesystemAdapter(
++      'sites/default/files/flysystem/local',
++      // Customize how visibility is converted to unix permissions
++      PortableVisibilityConverter::fromArray([
++        'file' => [
++          'public' => 0664,
++          'private' => 0604,
++        ],
++        'dir' => [
++          'public' => 0755,
++          'private' => 7604,
++        ],
++      ]),
++      // Write flags
++      LOCK_EX,
++      // How to deal with links, either DISALLOW_LINKS or SKIP_LINKS
++      // Disallowing them causes exceptions when encountered
++      LocalFilesystemAdapter::DISALLOW_LINKS
++    );
++    $this->cacheAdapter = new DrupalCacheAdapter(static::SCHEME, $this->adapter, $this->cacheItemBackend);
    }
  
    /**
