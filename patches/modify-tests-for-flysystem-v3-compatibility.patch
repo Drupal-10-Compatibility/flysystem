@@ -74,7 +74,7 @@ index f21fc6a..fe79a7e 100644
  
  }
 diff --git a/src/Flysystem/Adapter/DrupalCacheAdapter.php b/src/Flysystem/Adapter/DrupalCacheAdapter.php
-index 1ff2cc3..71b8190 100644
+index 1ff2cc3..b1a8e26 100644
 --- a/src/Flysystem/Adapter/DrupalCacheAdapter.php
 +++ b/src/Flysystem/Adapter/DrupalCacheAdapter.php
 @@ -2,18 +2,29 @@
@@ -169,9 +169,11 @@ index 1ff2cc3..71b8190 100644
    /**
     * {@inheritdoc}
     */
-@@ -124,11 +109,11 @@ class DrupalCacheAdapter implements FilesystemAdapter {
+@@ -123,12 +108,13 @@ class DrupalCacheAdapter implements FilesystemAdapter {
+       $item = $this->cacheItemBackend->load($path);
        $newItem = clone $item;
        $this->cacheItemBackend->set($newPath, $newItem);
++      $this->cacheItemBackend->delete($path);
      }
 -    catch (FilesystemException $exception) {
 +    catch (UnableToMoveFile $exception) {
@@ -184,7 +186,7 @@ index 1ff2cc3..71b8190 100644
      }
    }
  
-@@ -143,11 +128,11 @@ class DrupalCacheAdapter implements FilesystemAdapter {
+@@ -143,11 +129,11 @@ class DrupalCacheAdapter implements FilesystemAdapter {
        $newItem = clone $item;
        $this->cacheItemBackend->set($newPath, $newItem);
      }
@@ -199,7 +201,7 @@ index 1ff2cc3..71b8190 100644
      }
    }
  
-@@ -160,8 +145,11 @@ class DrupalCacheAdapter implements FilesystemAdapter {
+@@ -160,8 +146,11 @@ class DrupalCacheAdapter implements FilesystemAdapter {
        $this->cacheItemBackend->delete($path);
        // It is ok!
      }
@@ -213,8 +215,15 @@ index 1ff2cc3..71b8190 100644
      }
    }
  
-@@ -177,8 +165,11 @@ class DrupalCacheAdapter implements FilesystemAdapter {
-       $paths = array_column($contents, 'path');
+@@ -173,12 +162,17 @@ class DrupalCacheAdapter implements FilesystemAdapter {
+       // Before the delete we need to know what files are in the directory.
+       // Necessary to be able to delete them from the cache backend.
+       $contents = $this->adapter->listContents($dirname, TRUE);
++
+       $this->adapter->deleteDirectory($dirname);
+-      $paths = array_column($contents, 'path');
++      $directoryContents = iterator_to_array($contents);
++      $paths = array_column($directoryContents, 'path');
        $this->cacheItemBackend->deleteMultiple($paths);
      }
 -    catch (FilesystemException $exception) {
@@ -227,9 +236,14 @@ index 1ff2cc3..71b8190 100644
      }
    }
  
-@@ -192,10 +183,12 @@ class DrupalCacheAdapter implements FilesystemAdapter {
-       $item->updateMetadata($item);
-       $this->cacheItemBackend->set($dirname, $item);
+@@ -188,14 +182,14 @@ class DrupalCacheAdapter implements FilesystemAdapter {
+   public function createDirectory($dirname, Config $config): void {
+     try {
+       $this->adapter->createDirectory($dirname, $config);
+-      $item = new CacheItem();
+-      $item->updateMetadata($item);
+-      $this->cacheItemBackend->set($dirname, $item);
++      $this->updateMetadata($dirname);
      }
 -    catch (FilesystemException $exception) {
 -      throw new \Exception('Directory could not be created.');
@@ -243,7 +257,7 @@ index 1ff2cc3..71b8190 100644
    }
  
    /**
-@@ -206,11 +199,11 @@ class DrupalCacheAdapter implements FilesystemAdapter {
+@@ -206,11 +200,11 @@ class DrupalCacheAdapter implements FilesystemAdapter {
        $this->adapter->setVisibility($path, $visibility);
        $this->updateMetadata($path);
      }
@@ -258,7 +272,7 @@ index 1ff2cc3..71b8190 100644
      }
    }
  
-@@ -219,13 +212,13 @@ class DrupalCacheAdapter implements FilesystemAdapter {
+@@ -219,13 +213,13 @@ class DrupalCacheAdapter implements FilesystemAdapter {
     */
    public function fileExists($path): bool {
      try {
@@ -275,7 +289,7 @@ index 1ff2cc3..71b8190 100644
      }
    }
  
-@@ -234,13 +227,13 @@ class DrupalCacheAdapter implements FilesystemAdapter {
+@@ -234,13 +228,13 @@ class DrupalCacheAdapter implements FilesystemAdapter {
     */
    public function directoryExists($path): bool {
      try {
@@ -292,7 +306,7 @@ index 1ff2cc3..71b8190 100644
      }
    }
  
-@@ -260,10 +253,7 @@ class DrupalCacheAdapter implements FilesystemAdapter {
+@@ -260,10 +254,7 @@ class DrupalCacheAdapter implements FilesystemAdapter {
      if ($this->cacheItemBackend->has($path)) {
        return TRUE;
      }
@@ -304,7 +318,7 @@ index 1ff2cc3..71b8190 100644
    }
  
    /**
-@@ -273,11 +263,11 @@ class DrupalCacheAdapter implements FilesystemAdapter {
+@@ -273,11 +264,11 @@ class DrupalCacheAdapter implements FilesystemAdapter {
      try {
        return $this->adapter->read($path);
      }
@@ -319,7 +333,7 @@ index 1ff2cc3..71b8190 100644
      }
    }
  
-@@ -288,11 +278,11 @@ class DrupalCacheAdapter implements FilesystemAdapter {
+@@ -288,22 +279,30 @@ class DrupalCacheAdapter implements FilesystemAdapter {
      try {
        return $this->adapter->readStream($path);
      }
@@ -327,14 +341,18 @@ index 1ff2cc3..71b8190 100644
 +    catch (UnableToReadFile $exception) {
        // @todo Log exception to logs,need to implement logger
 -      // @todo Display user friendly error message
-+      $this->messenger()->addError($exception->getMessage());
++      // $this->messenger()->addError($exception->getMessage());
        // @todo The following exception throw is temporary
 -      throw new \Exception('Resource could not be read.');
 +      throw $exception;
      }
    }
  
-@@ -303,7 +293,15 @@ class DrupalCacheAdapter implements FilesystemAdapter {
+   /**
+    * {@inheritdoc}
+    */
+-  public function listContents($directory = '', $recursive = FALSE): array {
++  public function listContents($directory = '', $recursive = FALSE): iterable {
      // Don't cache directory listings to avoid having to keep track of
      // incomplete cache entries.
      // @todo This could be a good place for a micro-cache?
@@ -351,7 +369,7 @@ index 1ff2cc3..71b8190 100644
    }
  
    /**
-@@ -315,9 +313,9 @@ class DrupalCacheAdapter implements FilesystemAdapter {
+@@ -315,9 +314,9 @@ class DrupalCacheAdapter implements FilesystemAdapter {
      }
      catch (UnableToRetrieveMetadata $exception) {
        // @todo Log exception to logs,need to implement logger
@@ -363,7 +381,7 @@ index 1ff2cc3..71b8190 100644
      }
    }
  
-@@ -330,9 +328,9 @@ class DrupalCacheAdapter implements FilesystemAdapter {
+@@ -330,9 +329,9 @@ class DrupalCacheAdapter implements FilesystemAdapter {
      }
      catch (UnableToRetrieveMetadata $exception) {
        // @todo Log exception to logs,need to implement logger
@@ -375,19 +393,19 @@ index 1ff2cc3..71b8190 100644
      }
    }
  
-@@ -345,9 +343,9 @@ class DrupalCacheAdapter implements FilesystemAdapter {
+@@ -345,9 +344,9 @@ class DrupalCacheAdapter implements FilesystemAdapter {
      }
      catch (UnableToRetrieveMetadata $exception) {
        // @todo Log exception to logs,need to implement logger
 -      // @todo Display user friendly error message
-+      //$this->messenger()->addError($exception->getMessage());
++      // $this->messenger()->addError($exception->getMessage());
        // @todo The following exception throw is temporary
 -      throw new \Exception('Timestamp could not be retrieved.');
 +      throw $exception;
      }
    }
  
-@@ -356,13 +354,13 @@ class DrupalCacheAdapter implements FilesystemAdapter {
+@@ -356,13 +355,13 @@ class DrupalCacheAdapter implements FilesystemAdapter {
     */
    public function visibility($path): FileAttributes {
      try {
@@ -404,7 +422,7 @@ index 1ff2cc3..71b8190 100644
      }
    }
  
-@@ -383,15 +381,18 @@ class DrupalCacheAdapter implements FilesystemAdapter {
+@@ -383,15 +382,18 @@ class DrupalCacheAdapter implements FilesystemAdapter {
        // FileAttributes object.
        'type' => $entity->type(),
        'path' => $path,
@@ -513,24 +531,22 @@ index 9d71db4..59a0703 100644
    }
  
 diff --git a/tests/src/Unit/Flysystem/Adapter/DrupalCacheAdapterTest.php b/tests/src/Unit/Flysystem/Adapter/DrupalCacheAdapterTest.php
-index c8f8c40..d4fa48f 100644
+index c8f8c40..73264e6 100644
 --- a/tests/src/Unit/Flysystem/Adapter/DrupalCacheAdapterTest.php
 +++ b/tests/src/Unit/Flysystem/Adapter/DrupalCacheAdapterTest.php
-@@ -7,8 +7,12 @@ use Drupal\Core\Cache\MemoryBackend;
+@@ -7,8 +7,10 @@ use Drupal\Core\Cache\MemoryBackend;
  use Drupal\flysystem\Flysystem\Adapter\CacheItemBackend;
  use Drupal\flysystem\Flysystem\Adapter\DrupalCacheAdapter;
  use Drupal\Tests\UnitTestCase;
 -use League\Flysystem\FilesystemAdapter;
  use League\Flysystem\Config;
-+use League\Flysystem\FileAttributes;
-+use League\Flysystem\FilesystemAdapter;
++use League\Flysystem\StorageAttributes;
 +use League\Flysystem\Local\LocalFilesystemAdapter;
-+use League\Flysystem\UnixVisibility\PortableVisibilityConverter;
 +use League\Flysystem\Visibility;
  
  /**
   * Test the Drupal Cache Adapter.
-@@ -25,7 +29,7 @@ class DrupalCacheAdapterTest extends UnitTestCase {
+@@ -25,7 +27,7 @@ class DrupalCacheAdapterTest extends UnitTestCase {
     *
     * @var string
     */
@@ -539,38 +555,50 @@ index c8f8c40..d4fa48f 100644
  
    /**
     * The main test file.
-@@ -55,6 +59,11 @@ class DrupalCacheAdapterTest extends UnitTestCase {
+@@ -34,6 +36,13 @@ class DrupalCacheAdapterTest extends UnitTestCase {
+    */
+   const FILE = 'test.txt';
+ 
++  /**
++   * The directory for the LocalAdapter configuration.
++   *
++   * @var string
++   */
++  const ROOT = 'sites/default/files/flysystem/testing';
++
+   /**
+    * The wrapped Flysystem adapter.
+    *
+@@ -55,6 +64,13 @@ class DrupalCacheAdapterTest extends UnitTestCase {
     */
    protected $cacheItemBackend;
  
 +  /**
 +   * Timestamp of test run.
++   *
++   * @var int
 +   */
 +  protected $time;
 +
    /**
     * {@inheritdoc}
     */
-@@ -62,270 +71,357 @@ class DrupalCacheAdapterTest extends UnitTestCase {
+@@ -62,170 +78,124 @@ class DrupalCacheAdapterTest extends UnitTestCase {
      parent::setUp();
      $time = $this->prophesize(TimeInterface::class)->reveal();
      $this->cacheItemBackend = new CacheItemBackend(static::SCHEME, new MemoryBackend($time));
 -    $this->adapter = $this->prophesize(FilesystemAdapter::class);
 -    $this->cacheAdapter = new DrupalCacheAdapter(static::SCHEME, $this->adapter->reveal(), $this->cacheItemBackend);
 +    $this->adapter = new LocalFilesystemAdapter(
-+      'sites/default/files/flysystem/testing',
++      static::ROOT,
 +    );
 +    $this->cacheAdapter = new DrupalCacheAdapter(static::SCHEME, $this->adapter, $this->cacheItemBackend);
    }
  
-+  public function tearDown(): void {
-+    parent::tearDown();
-+    $this->delTree('sites/default/files/flysystem/testing');
-+  }
    /**
-    * Tests creating a public file.
-    */
-   public function testWriteSuccess() {
+-   * Tests creating a public file.
+-   */
+-  public function testWriteSuccess() {
 -    $config = new Config();
 -    $this->adapter
 -      ->write(static::FILE, 'contents', $config)
@@ -580,27 +608,13 @@ index c8f8c40..d4fa48f 100644
 -    $this->assertSame('public', $metadata['visibility']);
 -    $this->assertSame('public', $this->cacheAdapter->getVisibility(static::FILE)['visibility']);
 -    $this->assertTrue($this->cacheItemBackend->has(static::FILE));
-+    // Test Cache adapter write does not fail.
-+    try {
-+      $this->cacheAdapter->write(static::FILE, 'contents', new Config());
-+    }
-+    catch (FilesystemException $exception) {
-+      // @todo Log exception to logs,need to implement logger
-+      // @todo Display user friendly error message
-+      // @todo The following exception throw is temporary
-+      throw new \Exception('File could not be saved.');
-+    }
-+
-+    // Test file visibility.
-+    $fileAttributes = $this->cacheAdapter->visibility(static::FILE);
-+    $this->assertSame(Visibility::PUBLIC, $fileAttributes->visibility());
-   }
- 
-   /**
-    * Tests creating a public file stream.
+-  }
+-
+-  /**
+-   * Tests creating a public file stream.
++   * {@inheritdoc}
     */
-+  
-   public function testWriteStreamSuccess() {
+-  public function testWriteStreamSuccess() {
 -    $config = new Config();
 -    $stream = fopen('data:text/plain,contents', 'rb');
 -
@@ -612,11 +626,15 @@ index c8f8c40..d4fa48f 100644
 -    $this->assertSame(12345, $metadata['timestamp']);
 -    $this->assertSame(12345, $this->cacheAdapter->getTimestamp(static::FILE)['timestamp']);
 -    $this->assertTrue($this->cacheItemBackend->has(static::FILE));
--  }
--
--  /**
++  public function tearDown(): void {
++    parent::tearDown();
++    $this->delTree(static::ROOT);
+   }
+ 
+   /**
 -   * Tests public file updates.
--   */
++   * Tests creating a public file.
+    */
 -  public function testUpdateSuccess() {
 -    $config = new Config();
 -    $this->adapter
@@ -626,13 +644,21 @@ index c8f8c40..d4fa48f 100644
 -    $metadata = $this->cacheAdapter->update(static::FILE, 'contents', $config);
 -    $this->assertSame('public', $metadata['visibility']);
 -    $this->assertSame('public', $this->cacheAdapter->getVisibility(static::FILE)['visibility']);
--  }
--
--  /**
++  public function testWriteSuccess() {
++    $config = new Config([]);
++    // Test Cache adapter write does not fail.
++    $this->cacheAdapter->write(static::FILE, 'contents', $config);
++    $fileAttributes = $this->cacheAdapter->visibility(static::FILE);
++    $this->assertSame(Visibility::PUBLIC, $fileAttributes->visibility());
+   }
+ 
+   /**
 -   * Tests public file stream updates.
--   */
++   * Tests creating a public file stream.
+    */
 -  public function testUpdateStreamSuccess() {
 -    $config = new Config();
++  public function testWriteStreamSuccess() {
 +    $config = new Config([]);
      $stream = fopen('data:text/plain,contents', 'rb');
  
@@ -644,27 +670,13 @@ index c8f8c40..d4fa48f 100644
 -    $this->assertSame('test_mimetype', $metadata['mimetype']);
 -    $this->assertSame('test_mimetype', $this->cacheAdapter->getMimetype(static::FILE)['mimetype']);
 -    $this->assertTrue($this->cacheItemBackend->has(static::FILE));
-+    // Test Cache adapter writeStream does not fail.
-+    try {
-+      try {
-+        $this->cacheAdapter->writeStream(static::FILE, $stream, $config);
-+        $this->time = time();
-+      }
-+      catch (\Throwable $e) {
-+        $this->fail();
-+      }
-+      $this->assertTrue(TRUE);
-+    }
-+    catch (\Throwable $e) {
-+      $this->fail();
-+      echo 'Caught exception: ',  $e->getMessage(), "\n";
-+    }
++    $this->cacheAdapter->writeStream(static::FILE, $stream, $config);
++    $this->time = time();
 +    // Test lastModified on.
 +    $fileAttributes = $this->cacheAdapter->lastModified(static::FILE);
 +    $this->assertSame($this->time, $fileAttributes->lastModified());
    }
--
-+  
+ 
    /**
 -   * Tests renaming a file.
 +   * Tests renaming a file. Recursion error.
@@ -675,7 +687,9 @@ index c8f8c40..d4fa48f 100644
 -      ->write(static::FILE, 'contents', $config)
 -      ->willReturn(['size' => 1234]);
 -
--    $this->cacheAdapter->write(static::FILE, 'contents', $config);
++  public function testMoveSuccess() {
++    $config = new Config([]);
+     $this->cacheAdapter->write(static::FILE, 'contents', $config);
 -
 -    $this->adapter
 -      ->rename(static::FILE, 'new.txt')
@@ -683,102 +697,54 @@ index c8f8c40..d4fa48f 100644
 -
 -    $this->assertTrue($this->cacheAdapter->rename(static::FILE, 'new.txt'));
 -    $this->assertSame(1234, $this->cacheAdapter->getSize('new.txt')['size']);
-+  /*
-+  public function testMoveSuccess() {
-+    $config = new Config([]);
-+    try {
-+      try {
-+        $this->cacheAdapter->write(static::FILE, 'contents', $config);
-+      }
-+      catch (\Throwable $e) {
-+        $this->fail();
-+        echo 'Caught exception: ',  $e->getMessage(), "\n";
-+      }
-+      $this->assertTrue(TRUE);
-+    }
-+    catch (\Throwable $e) {
-+      $this->fail();
-+    }
+-
 +    $fileAttributes = $this->cacheAdapter->visibility(static::FILE);
 +    $this->assertSame(Visibility::PUBLIC, $fileAttributes->visibility());
 +    // Test Cache adapter move does not fail.
-+    try {
-+      try {
-+        $this->cacheAdapter->move(static::FILE, 'new.txt');
-+      }
-+      catch (\Throwable $e) {
-+        $this->fail();
-+        echo 'Caught exception: ',  $e->getMessage(), "\n";
-+      }
-+      $this->assertTrue(TRUE);
-+    }
-+    catch (\Throwable $e) {
-+      $this->fail();
-+    }
- 
++    $this->cacheAdapter->move(static::FILE, 'new.txt', $config);
      $this->assertFalse($this->cacheItemBackend->has(static::FILE));
      $this->assertTrue($this->cacheItemBackend->has('new.txt'));
 -
 +    $fileAttributes = $this->cacheAdapter->visibility('new.txt');
 +    $this->assertSame(Visibility::PUBLIC, $fileAttributes->visibility());
++
++    $this->cacheAdapter->write('first.txt', 'contents', $config);
++    $this->assertFileExists(static::ROOT . '/first.txt');
++    $this->assertFileHasPermissions(static::ROOT . '/first.txt', 0644);
++    $this->cacheAdapter->move('first.txt', 'second.txt', new Config(['visibility' => 'private']));
++    $this->assertFileExists(static::ROOT . '/second.txt');
++    $this->assertFileHasPermissions(static::ROOT . '/second.txt', 0600);
    }
--
-+  */
+ 
    /**
 -   * Tests copying a file.
 +   * Tests copying a file.  Recursion error.
     */
-+  /*
    public function testCopySuccess() {
 -    $config = new Config();
 -    $this->adapter
 -      ->write(static::FILE, 'contents', $config)
 -      ->willReturn(['size' => 1234]);
 -
--    $this->cacheAdapter->write(static::FILE, 'contents', $config);
--
++    $config = new Config([]);
+     $this->cacheAdapter->write(static::FILE, 'contents', $config);
++    $fileAttributes = $this->cacheAdapter->visibility(static::FILE);
++    $this->assertSame(Visibility::PUBLIC, $fileAttributes->visibility());
+ 
 -    $this->adapter->copy(static::FILE, 'new.txt')->willReturn(TRUE);
 -
 -    $this->assertTrue($this->cacheAdapter->copy(static::FILE, 'new.txt'));
-+    $config = new Config([]);
-+    try {
-+      try {
-+        $this->cacheAdapter->write(static::FILE, 'contents', $config);
-+      }
-+      catch (\Throwable $e) {
-+        $this->fail();
-+      }
-+      $this->assertTrue(TRUE);
-+    }
-+    catch (\Throwable $e) {
-+      $this->fail();
-+    }
-+    $fileAttributes = $this->cacheAdapter->visibility(static::FILE);
-+    $this->assertSame(Visibility::PUBLIC, $fileAttributes->visibility());
-+
-+    // Test Cache adapter copy does not fail.
-+    try {
-+      try {
-+        $this->cacheAdapter->copy(static::FILE, 'new.txt');
-+      }
-+      catch (\Throwable $e) {
-+        $this->fail();
-+      }
-+      $this->assertTrue(TRUE);
-+    }
-+    catch (\Throwable $e) {
-+      $this->fail();
-+    }
- 
+-
 -    $this->assertSame(1234, $this->cacheAdapter->getSize(static::FILE)['size']);
 -    $this->assertSame(1234, $this->cacheAdapter->getSize('new.txt')['size']);
++    // Test Cache adapter copy does not fail.
++    $this->cacheAdapter->copy(static::FILE, 'new.txt', $config);
      $this->assertTrue($this->cacheItemBackend->has(static::FILE));
      $this->assertTrue($this->cacheItemBackend->has('new.txt'));
 +    $fileAttributes = $this->cacheAdapter->visibility('new.txt');
 +    $this->assertSame(Visibility::PUBLIC, $fileAttributes->visibility());
    }
--
-+  */
+ 
    /**
     * Tests deleting a file.
     */
@@ -788,47 +754,20 @@ index c8f8c40..d4fa48f 100644
 -      ->write(static::FILE, 'contents', $config)
 -      ->willReturn(['size' => 1234]);
 -
--    $this->cacheAdapter->write(static::FILE, 'contents', $config);
 +    $config = new Config([]);
-+    try {
-+      try {
-+        $this->cacheAdapter->write(static::FILE, 'contents', $config);
-+      }
-+      catch (\Throwable $e) {
-+        $this->fail();
-+      }
-+      $this->assertTrue(TRUE);
-+    }
-+    catch (\Throwable $e) {
-+      $this->fail();
-+      echo 'Caught exception: ',  $e->getMessage(), "\n";
-+    }
+     $this->cacheAdapter->write(static::FILE, 'contents', $config);
 +    $fileAttributes = $this->cacheAdapter->visibility(static::FILE);
 +    $this->assertSame(Visibility::PUBLIC, $fileAttributes->visibility());
-+
-+    try {
-+      try {
-+        $this->cacheAdapter->delete(static::FILE);
-+      }
-+      catch (\Throwable $e) {
-+        $this->fail();
-+      }
-+      $this->assertTrue(TRUE);
-+    }
-+    catch (\Throwable $e) {
-+      $this->fail();
-+      echo 'Caught exception: ',  $e->getMessage(), "\n";
-+    }
  
 -    $this->adapter->delete(static::FILE)->willReturn(TRUE);
 -
 -    $this->assertTrue($this->cacheAdapter->delete(static::FILE));
++    $this->cacheAdapter->delete(static::FILE);
      $this->assertFalse($this->cacheItemBackend->has(static::FILE));
    }
--
+ 
    /**
--   * Tests deleting a file directory.
-+   * Tests deleting a file directory.  Failing.
+    * Tests deleting a file directory.
     */
 -  public function testDeleteDirSuccess() {
 -    $config = new Config();
@@ -847,79 +786,41 @@ index c8f8c40..d4fa48f 100644
 -
 -    $this->assertTrue($this->cacheAdapter->deleteDir('test_dir'));
 -
-+  /*
+-    $this->assertFalse($this->cacheItemBackend->has('test_dir/test.txt'));
+-    $this->assertFalse($this->cacheItemBackend->has('test_dir'));
 +  public function testDeleteDirectorySuccess() {
-+    $config = new Config([]);
-+    try {
-+      try {
-+        $this->cacheAdapter->createDirectory('test_dir', $config);
-+        $this->cacheAdapter->write('test_dir/test.txt', 'contents', $config);
-+      }
-+      catch (\Throwable $e) {
-+        $this->fail();
-+      }
-+      $this->assertTrue(TRUE);
-+    }
-+    catch (\Throwable $e) {
-+      echo 'Caught exception: ',  $e->getMessage(), "\n";
-+      $this->fail();
-+    }
-+    $fileAttributes = $this->cacheAdapter->visibility('test_dir/test.txt');
-+    $this->assertSame(Visibility::PUBLIC, $fileAttributes->visibility());
-+    try {
-+      try {
-+        $this->cacheAdapter->deleteDirectory('test_dir');
-+      }
-+      catch (\Throwable $e) {
-+        $this->fail();
-+      }
-+      $this->assertTrue(TRUE);
-+    }
-+    catch (\Throwable $e) {
-+      $this->fail();
-+      echo 'Caught exception: ',  $e->getMessage(), "\n";
-+    }
-     $this->assertFalse($this->cacheItemBackend->has('test_dir/test.txt'));
-     $this->assertFalse($this->cacheItemBackend->has('test_dir'));
++    mkdir(static::ROOT . '/directory/subdir/', 0744, TRUE);
++    $this->assertDirectoryExists(static::ROOT . '/directory/subdir/');
++    file_put_contents(static::ROOT . '/directory/subdir/file.txt', 'content');
++    symlink(static::ROOT . '/directory/subdir/file.txt', static::ROOT . '/directory/subdir/link.txt');
++    $this->cacheAdapter->deleteDirectory('directory/subdir');
++    $this->assertDirectoryDoesNotExist(static::ROOT . '/directory/subdir/');
++    $this->cacheAdapter->deleteDirectory('directory');
++    $this->assertDirectoryDoesNotExist(static::ROOT . '/directory/');
++
    }
--
-+  */
+ 
    /**
--   * Tests visibility checking on private files.
-+   * Tests visibility checking on private files.  Recursion error.
+    * Tests visibility checking on private files.
     */
-+  /*
    public function testSetVisibilitySuccess() {
 -    $this->adapter
 -      ->setVisibility(static::FILE, 'private')
 -      ->willReturn(['visibility' => 'private']);
--
++    $config = new Config([]);
++    $this->cacheAdapter->write(static::FILE, 'contents', $config);
++    $this->cacheAdapter->setVisibility(static::FILE, 'private');
+ 
 -    $metadata = $this->cacheAdapter->setVisibility(static::FILE, 'private');
 -    $this->assertSame('private', $metadata['visibility']);
 -    $this->assertSame('private', $this->cacheAdapter->getVisibility(static::FILE)['visibility']);
-+    try {
-+      try {
-+        $this->cacheAdapter->setVisibility(static::FILE, 'private');
-+      }
-+      catch (\Throwable $e) {
-+        $this->fail();
-+      }
-+      $this->assertTrue(TRUE);
-+    }
-+    catch (\Throwable $e) {
-+      echo 'Caught exception: ',  $e->getMessage(), "\n";
-+      $this->fail();
-+    }
-+
 +    $fileAttributes = $this->cacheAdapter->visibility(static::FILE);
      $this->assertTrue($this->cacheItemBackend->has(static::FILE));
 +    $this->assertSame('private', $fileAttributes->visibility());
    }
--
-+  */
+ 
    /**
-    * Tests file loading success.
-    */
+@@ -234,98 +204,106 @@ class DrupalCacheAdapterTest extends UnitTestCase {
    public function testHasSuccess() {
      $cache_item = $this->cacheItemBackend->load(static::FILE);
      $this->cacheItemBackend->set(static::FILE, $cache_item);
@@ -931,13 +832,11 @@ index c8f8c40..d4fa48f 100644
 -   * Tests file loading failure.
 +   * Tests file loading failure.  Failing.
     */
-+  /*
    public function testHasFail() {
 -    $this->adapter->has(static::FILE)->willReturn(TRUE);
 -    $this->assertTrue($this->cacheAdapter->has(static::FILE));
-+    $this->assertTrue($this->cacheItemBackend->has(static::FILE));
++    $this->assertFalse($this->cacheItemBackend->has(static::FILE));
    }
-+  */
  
    /**
     * Tests reading a file.
@@ -945,7 +844,7 @@ index c8f8c40..d4fa48f 100644
    public function testRead() {
 -    $this->adapter->read(static::FILE)->willReturn(FALSE);
 -    $this->assertFalse($this->cacheAdapter->read(static::FILE));
- 
+-
 -    $config = new Config();
 -    $this->adapter
 -      ->write(static::FILE, 'contents', $config);
@@ -956,136 +855,133 @@ index c8f8c40..d4fa48f 100644
 -    ];
 -    $this->adapter->read(static::FILE)->willReturn($return);
 -    $this->assertSame($this->cacheAdapter->read(static::FILE), $return);
++
 +    $config = new Config([]);
 +    try {
-+      try {
-+        $this->cacheAdapter->write(static::FILE, 'contents', $config);
-+      }
-+      catch (\Throwable $e) {
-+        $this->fail();
-+      }
-+      $this->assertTrue(TRUE);
++      $this->cacheAdapter->write(static::FILE, 'contents', $config);
 +    }
 +    catch (\Throwable $e) {
-+      echo 'Caught exception: ',  $e->getMessage(), "\n";
++      echo 'Caught exception: ', $e->getMessage(), "\n";
 +      $this->fail();
 +    }
++
 +    $fileAttributes = $this->cacheAdapter->visibility(static::FILE);
 +    $this->assertSame(Visibility::PUBLIC, $fileAttributes->visibility());
 +    $this->assertSame($this->cacheAdapter->read(static::FILE), 'contents');
    }
  
    /**
--   * Tests reading a stream.
-+   * Tests reading a stream.  Failing.
+    * Tests reading a stream.
     */
-+  /*
    public function testReadStream() {
 -    $this->adapter->readStream(static::FILE)->willReturn(FALSE);
 -    $this->assertFalse($this->cacheAdapter->readStream(static::FILE));
 -
 -    $config = new Config();
-+    $config = new Config([]);
-     $stream = fopen('data:text/plain,contents', 'rb');
+-    $stream = fopen('data:text/plain,contents', 'rb');
 -    $this->adapter
 -      ->writeStream(static::FILE, $stream, $config);
- 
-+    // Test Cache adapter writeStream does not fail.
-+    try {
-+      try {
-+        $this->cacheAdapter->writeStream(static::FILE, $stream, $config);
-+      }
-+      catch (\Throwable $e) {
-+        $this->fail();
-+      }
-+      $this->assertTrue(TRUE);
-+    }
-+    catch (\Throwable $e) {
-+      echo 'Caught exception: ',  $e->getMessage(), "\n";
-+      $this->fail();
-+    }
-     $return = [
-       'type' => 'file',
-       'path' => static::FILE,
-       'stream' => $stream,
-     ];
+-
+-    $return = [
+-      'type' => 'file',
+-      'path' => static::FILE,
+-      'stream' => $stream,
+-    ];
++    $config = new Config([]);
  
 -    $this->adapter->readStream(static::FILE)->willReturn($return);
-     $this->assertSame($this->cacheAdapter->readStream(static::FILE), $return);
--  }
+-    $this->assertSame($this->cacheAdapter->readStream(static::FILE), $return);
++    $this->cacheAdapter->write(static::FILE, 'contents', $config);
++    $contents = $this->cacheAdapter->readStream(static::FILE);
++    $this->assertIsResource($contents);
++    $fileContents = stream_get_contents($contents);
++    fclose($contents);
++    $this->assertEquals('contents', $fileContents);
+   }
  
-+  }
-+  */
    /**
--   * Tests listing contents of a directory.
-+   * Tests listing contents of a directory.  Failing.
+    * Tests listing contents of a directory.
     */
-+  /*
    public function testListContentsSuccess() {
-+    $config = new Config([]);
-+    try {
-+      try {
-+        $this->cacheAdapter->createDirectory('test_dir', $config);
-+        $this->cacheAdapter->write('test_dir/test.txt', 'contents', $config);
-+      }
-+      catch (\Throwable $e) {
-+        $this->fail();
-+      }
-+      $this->assertTrue(TRUE);
-+    }
-+    catch (\Throwable $e) {
-+      echo 'Caught exception: ',  $e->getMessage(), "\n";
-+      $this->fail();
-+    }
-+    $fileAttributes = $this->cacheAdapter->visibility('test_dir/test.txt');
-+    $this->assertSame(Visibility::PUBLIC, $fileAttributes->visibility());
-+
-     $return = [
-       ['path' => 'test_dir'],
-       ['path' => 'test_dir/test.txt'],
-     ];
- 
+-    $return = [
+-      ['path' => 'test_dir'],
+-      ['path' => 'test_dir/test.txt'],
+-    ];
+-
 -    $this->adapter->listContents('test_dir', TRUE)->willReturn($return);
 -    $this->assertSame($this->cacheAdapter->listContents('test_dir', TRUE), $return);
-+    $this->assertSame((array) $this->cacheAdapter->listContents('test_dir', TRUE), $return);
++    $config = new Config([]);
++    $this->cacheAdapter->write('directory/filename.txt', 'content', $config);
++    $this->cacheAdapter->write('filename.txt', 'content', $config);
++    /** @var Traversable $contentListing */
++    $contentListing = $this->cacheAdapter->listContents('/', FALSE);
++    $contents = iterator_to_array($contentListing);
++    $this->assertCount(2, $contents);
++    $this->assertContainsOnlyInstancesOf(StorageAttributes::class, $contents);
    }
--
--  /**
+ 
+   /**
 -   * Tests retrieving file metadata.
--   */
++   * Tests listing contents of a directory recursively.
+    */
 -  public function testGetMetadataSuccess() {
 -    $cache_item = $this->cacheItemBackend->load(static::FILE);
 -    $cache_item->updateMetadata(['type' => 'dir']);
 -    $this->cacheItemBackend->set(static::FILE, $cache_item);
 -
 -    $this->assertSame('dir', $this->cacheAdapter->getMetadata(static::FILE)['type']);
-+  */
-+  protected function delTree($path) {
-+    $files = array_diff(scandir($path), array('.','..'));   
-+    foreach ($files as $file) {
-+      (is_dir("$path/$file")) ? $this->delTree("$path/$file") : unlink("$path/$file");
-+    } 
-+    return rmdir($path);
++  public function testListContentsSuccessRecursively() {
++    $config = new Config([]);
++    $this->cacheAdapter->write('directory/filename.txt', 'content', $config);
++    $this->cacheAdapter->write('filename.txt', 'content', $config);
++    /** @var Traversable $contentListing */
++    $contentListing = $this->cacheAdapter->listContents('/', TRUE);
++    $contents = iterator_to_array($contentListing);
++    $this->assertCount(3, $contents);
++    $this->assertContainsOnlyInstancesOf(StorageAttributes::class, $contents);
    }
--
--  /**
+ 
+   /**
 -   * Tests failing to retrieve file metadata.
--   */
++   * Recursively deletes a directory.
++   *
++   * @param string $path
++   *   Directory path to delete.
++   *
++   * @return bool
++   *   True on success, False on failure.
+    */
 -  public function testGetMetadataFail() {
 -    $this->adapter->getMetadata(static::FILE)->willReturn(['type' => 'dir']);
 -
 -    $this->assertSame('dir', $this->cacheAdapter->getMetadata(static::FILE)['type']);
--  }
--
--  /**
++  protected function delTree($path) {
++    $files = array_diff(scandir($path), ['.', '..']);
++    foreach ($files as $file) {
++      (is_dir("$path/$file")) ? $this->delTree("$path/$file") : unlink("$path/$file");
++    }
++    return rmdir($path);
+   }
+ 
+   /**
 -   * Tests failing to retrieve file size.
--   */
++   * Checks that a file has indicated permissions.
++   *
++   * @param string $file
++   *   File to check.
++   * @param int $expectedPermissions
++   *   Permissions to check on file.
+    */
 -  public function testGetSizeFail() {
 -    $this->adapter->getSize(static::FILE)->willReturn(['size' => 123]);
 -
 -    $this->assertSame(123, $this->cacheAdapter->getSize(static::FILE)['size']);
--  }
--
++  private function assertFileHasPermissions(string $file, int $expectedPermissions): void {
++    clearstatcache(FALSE, $file);
++    $permissions = fileperms($file) & 0777;
++    $this->assertEquals($expectedPermissions, $permissions);
+   }
+ 
  }
 diff --git a/tests/src/Unit/Flysystem/Adapter/MissingAdapterTest.php b/tests/src/Unit/Flysystem/Adapter/MissingAdapterTest.php
 index 7bae52f..c225b32 100644
