@@ -370,7 +370,7 @@ index 1ff2cc3..b1a8e26 100644
      }
    }
 diff --git a/tests/src/Unit/Flysystem/Adapter/DrupalCacheAdapterTest.php b/tests/src/Unit/Flysystem/Adapter/DrupalCacheAdapterTest.php
-index c8f8c40..c182140 100644
+index c8f8c40..3efd93e 100644
 --- a/tests/src/Unit/Flysystem/Adapter/DrupalCacheAdapterTest.php
 +++ b/tests/src/Unit/Flysystem/Adapter/DrupalCacheAdapterTest.php
 @@ -7,8 +7,10 @@ use Drupal\Core\Cache\MemoryBackend;
@@ -422,17 +422,22 @@ index c8f8c40..c182140 100644
    /**
     * {@inheritdoc}
     */
-@@ -62,170 +78,137 @@ class DrupalCacheAdapterTest extends UnitTestCase {
+@@ -62,170 +78,157 @@ class DrupalCacheAdapterTest extends UnitTestCase {
      parent::setUp();
      $time = $this->prophesize(TimeInterface::class)->reveal();
      $this->cacheItemBackend = new CacheItemBackend(static::SCHEME, new MemoryBackend($time));
 -    $this->adapter = $this->prophesize(FilesystemAdapter::class);
 -    $this->cacheAdapter = new DrupalCacheAdapter(static::SCHEME, $this->adapter->reveal(), $this->cacheItemBackend);
--  }
--
--  /**
++    $this->adapter = new LocalFilesystemAdapter(
++      static::ROOT,
++    );
++    $this->cacheAdapter = new DrupalCacheAdapter(static::SCHEME, $this->adapter, $this->cacheItemBackend);
+   }
+ 
+   /**
 -   * Tests creating a public file.
--   */
++   * {@inheritdoc}
+    */
 -  public function testWriteSuccess() {
 -    $config = new Config();
 -    $this->adapter
@@ -443,15 +448,15 @@ index c8f8c40..c182140 100644
 -    $this->assertSame('public', $metadata['visibility']);
 -    $this->assertSame('public', $this->cacheAdapter->getVisibility(static::FILE)['visibility']);
 -    $this->assertTrue($this->cacheItemBackend->has(static::FILE));
-+    $this->adapter = new LocalFilesystemAdapter(
-+      static::ROOT,
-+    );
-+    $this->cacheAdapter = new DrupalCacheAdapter(static::SCHEME, $this->adapter, $this->cacheItemBackend);
++  public function tearDown(): void {
++    parent::tearDown();
++    $this->delTree(static::ROOT);
    }
  
    /**
 -   * Tests creating a public file stream.
-+   * {@inheritdoc}
++   * @covers ::write
++   * @covers ::visibility
     */
 -  public function testWriteStreamSuccess() {
 -    $config = new Config();
@@ -465,16 +470,11 @@ index c8f8c40..c182140 100644
 -    $this->assertSame(12345, $metadata['timestamp']);
 -    $this->assertSame(12345, $this->cacheAdapter->getTimestamp(static::FILE)['timestamp']);
 -    $this->assertTrue($this->cacheItemBackend->has(static::FILE));
-+  public function tearDown(): void {
-+    parent::tearDown();
-+    $this->delTree(static::ROOT);
-   }
- 
-   /**
+-  }
+-
+-  /**
 -   * Tests public file updates.
-+   * @covers ::write
-+   * @covers ::visibility
-    */
+-   */
 -  public function testUpdateSuccess() {
 -    $config = new Config();
 -    $this->adapter
@@ -495,6 +495,9 @@ index c8f8c40..c182140 100644
    /**
 -   * Tests public file stream updates.
 +   * Tests creating a public file stream.
++   *
++   * @covers ::writeStream
++   * @covers ::lastModified
     */
 -  public function testUpdateStreamSuccess() {
 -    $config = new Config();
@@ -518,8 +521,11 @@ index c8f8c40..c182140 100644
    }
  
    /**
--   * Tests renaming a file.
-+   * Tests renaming a file. Recursion error.
+    * Tests renaming a file.
++   *
++   * @covers ::write
++   * @covers ::visibility
++   * @covers ::move 
     */
 -  public function testRenameSuccess() {
 -    $config = new Config();
@@ -566,8 +572,11 @@ index c8f8c40..c182140 100644
    }
  
    /**
--   * Tests copying a file.
-+   * Tests copying a file.  Recursion error.
+    * Tests copying a file.
++   *
++   * @covers ::write
++   * @covers ::copy
++   * @covers ::visibility
     */
    public function testCopySuccess() {
 -    $config = new Config();
@@ -600,6 +609,10 @@ index c8f8c40..c182140 100644
  
    /**
     * Tests deleting a file.
++   *
++   * @covers ::write
++   * @covers ::visibility
++   * @covers ::delete
     */
    public function testDeleteSuccess() {
 -    $config = new Config();
@@ -621,6 +634,8 @@ index c8f8c40..c182140 100644
  
    /**
     * Tests deleting a file directory.
++   *
++   * @covers ::deleteDirectory
     */
 -  public function testDeleteDirSuccess() {
 -    $config = new Config();
@@ -655,6 +670,9 @@ index c8f8c40..c182140 100644
  
    /**
     * Tests visibility checking on private files.
++   *
++   * @covers ::setVisibility
++   * @covers ::visibility
     */
    public function testSetVisibilitySuccess() {
 -    $this->adapter
@@ -673,7 +691,7 @@ index c8f8c40..c182140 100644
    }
  
    /**
-@@ -234,98 +217,106 @@ class DrupalCacheAdapterTest extends UnitTestCase {
+@@ -234,98 +237,113 @@ class DrupalCacheAdapterTest extends UnitTestCase {
    public function testHasSuccess() {
      $cache_item = $this->cacheItemBackend->load(static::FILE);
      $this->cacheItemBackend->set(static::FILE, $cache_item);
@@ -693,6 +711,10 @@ index c8f8c40..c182140 100644
  
    /**
     * Tests reading a file.
++   *
++   * @covers ::write
++   * @covers ::visibility
++   * @covers ::read
     */
    public function testRead() {
 -    $this->adapter->read(static::FILE)->willReturn(FALSE);
@@ -710,13 +732,7 @@ index c8f8c40..c182140 100644
 -    $this->assertSame($this->cacheAdapter->read(static::FILE), $return);
 +
 +    $config = new Config([]);
-+    try {
-+      $this->cacheAdapter->write(static::FILE, 'contents', $config);
-+    }
-+    catch (\Throwable $e) {
-+      echo 'Caught exception: ', $e->getMessage(), "\n";
-+      $this->fail();
-+    }
++    $this->cacheAdapter->write(static::FILE, 'contents', $config);
 +
 +    $fileAttributes = $this->cacheAdapter->visibility(static::FILE);
 +    $this->assertSame(Visibility::PUBLIC, $fileAttributes->visibility());
@@ -725,6 +741,9 @@ index c8f8c40..c182140 100644
  
    /**
     * Tests reading a stream.
++   *
++   * @covers ::write
++   * @covers ::readStream
     */
    public function testReadStream() {
 -    $this->adapter->readStream(static::FILE)->willReturn(FALSE);
@@ -754,6 +773,9 @@ index c8f8c40..c182140 100644
  
    /**
     * Tests listing contents of a directory.
++   *
++   * @covers ::write
++   * @covers ::listContents
     */
    public function testListContentsSuccess() {
 -    $return = [
@@ -776,6 +798,9 @@ index c8f8c40..c182140 100644
    /**
 -   * Tests retrieving file metadata.
 +   * Tests listing contents of a directory recursively.
++   *
++   * @covers ::write
++   * @covers ::listContents
     */
 -  public function testGetMetadataSuccess() {
 -    $cache_item = $this->cacheItemBackend->load(static::FILE);
