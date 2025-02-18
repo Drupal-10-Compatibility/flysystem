@@ -12,19 +12,6 @@
         {
             "type": "composer",
             "url": "https://asset-packagist.org"
-        },
-        {
-            "type": "package",
-            "package": {
-                "name": "drupal-libraries/flystream",
-                "version": "3.x-dev",
-                "type": "library",
-                "source": {
-                    "url": "https://github.com/drupal-libraries/flystream",
-                    "type": "git",
-                    "reference": "3.x-dev#1f7e2f1"
-                }
-            }
         }
     ],
     "require": {
@@ -36,23 +23,16 @@
         "drupal/flysystem": "3.0.x-dev",
         "drush/drush": "^13.3",
         "league/flysystem": "^3.1",
-        "drupal-libraries/flystream": "3.x-dev#1f7e2f1",
         "mglaman/composer-drupal-lenient": "^1.0",
         "oomphinc/composer-installers-extender": "^2.0",
         "wikimedia/composer-merge-plugin": "^2.0"
     },
     "require-dev": {
         "drupal/core-dev": "^10.3",
-        "league/flysystem-local": "^3.0",
         "league/flysystem-memory": "^3.0",
         "phpcompatibility/php-compatibility": "8.1.0",
         "phpspec/prophecy": "~1.0",
         "phpstan/phpstan-deprecation-rules": "^1.0"
-    },
-    "autoload": {
-        "psr-4": {
-            "DrupalLibraries\\Flystream\\": "vendor/drupal-libraries/flystream/src"
-        }
     },
     "conflict": {
         "drupal/drupal": "*"
@@ -141,7 +121,7 @@
                 "Fixing php 8.2 compatibility issues with php-compatibility-sniffer":"patches/php-compatibility-sniffer-8.1-patch.patch"
             },
             "drupal/flysystem": {
-                "Modify tests for Flysystem v3 compatibility": "patches/modify-tests-for-flysystem-v3-compatibility.patch"
+                "Ongoing work on DrupalCacheAdapter": "patches/drupal-cache-adapter-refactoring.patch"
             }
         },
         "drupal-lenient": {
