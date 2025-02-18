@@ -74,4 +74,4 @@ jobs:
       - name: Run PHPUnit Test Coverage Analysis on Flysystem module
         if: always()
         run: |
-          $(pwd)/vendor/bin/phpunit -c $(pwd)/phpunit.xml.dist --group=${{ env.MODULE }} $(pwd)/${{ env.DRUPAL_ROOT }}/modules/contrib/${{ env.MODULE }} --coverage-text
+          $(pwd)/vendor/bin/phpunit -c $(pwd)/${{ env.DRUPAL_ROOT }}/modules/contrib/${{ env.MODULE }} --group=${{ env.MODULE }} $(pwd)/${{ env.DRUPAL_ROOT }}/modules/contrib/${{ env.MODULE }} --coverage-text
