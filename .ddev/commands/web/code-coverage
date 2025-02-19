@@ -1,7 +1,7 @@
 #!/bin/bash
-## Description: Execute any unit tests for the project (run `ddev install` first)
-## Usage: unit-tests
-## Example: "ddev unit-tests"
+## Description: Produce unit test code coverage report.
+## Usage: code-coverage
+## Example: "ddev code-coverage"
 
 readarray -t projects < <(awk -F',' '{ for( i=1; i<=NF; i++ ) print $i }' <<<"$PROJECT_NAMES")
 delete=media
@@ -12,5 +12,6 @@ projects=( "${projects[@]/$delete}" )
 for i in "${projects[@]}"
 do
   ##/var/www/html/vendor/bin/phpunit -c /var/www/html/$DDEV_DOCROOT/modules/contrib/$i/phpunit.xml.dist --migrate-configuration
-  XDEBUG_MODE=coverage /var/www/html/vendor/bin/phpunit -c /var/www/html/$DDEV_DOCROOT/modules/contrib/$i/phpunit.xml.dist --group=$i /var/www/html/$DDEV_DOCROOT/modules/contrib/$i
+  XDEBUG_MODE=coverage /var/www/html/vendor/bin/phpunit -c /var/www/html/$DDEV_DOCROOT/modules/contrib/$i/phpunit.xml.dist --group=$i /var/www/html/$DDEV_DOCROOT/modules/contrib/$i --coverage-text
+  ##--coverage-html /var/www/html/$DDEV_DOCROOT/coverage
 done

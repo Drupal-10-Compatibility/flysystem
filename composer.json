@@ -121,7 +121,6 @@
                 "Fixing php 8.2 compatibility issues with php-compatibility-sniffer":"patches/php-compatibility-sniffer-8.1-patch.patch"
             },
             "drupal/flysystem": {
-                "Ongoing work on DrupalCacheAdapter": "patches/drupal-cache-adapter-refactoring.patch"
             }
         },
         "drupal-lenient": {
