@@ -1,0 +1,113 @@
+diff --git a/tests/src/Unit/Form/FlysystemAdapterConfigFormTest.php b/tests/src/Unit/Form/FlysystemAdapterConfigFormTest.php
+new file mode 100644
+index 0000000..03bd364
+--- /dev/null
++++ b/tests/src/Unit/Form/FlysystemAdapterConfigFormTest.php
+@@ -0,0 +1,107 @@
++<?php
++
++namespace Drupal\Tests\flysystem\Unit\Form;
++
++use Drupal\Core\Form\FormState;
++use Drupal\flysystem\FlysystemAdapterPluginManager;
++use Drupal\Core\Messenger\MessengerInterface;
++use Drupal\flysystem\Form\FlysystemAdapterConfigForm;
++use Drupal\Tests\UnitTestCase;
++use Prophecy\Argument;
++use Symfony\Component\DependencyInjection\ContainerBuilder;
++
++/**
++ * @coversDefaultClass \Drupal\flysystem\Form\FlysystemAdapterConfigForm
++ * @group flysystem
++ */
++class FlysystemAdapterConfigFormTest extends UnitTestCase {
++
++/**
++ * The adapter plugin manager prophecy.
++ *
++ * @var \Prophecy\Prophecy\ObjectProphecy
++ */
++protected $subAdapterPluginManager;
++
++/**
++ * The messenger prophecy.
++ *
++ * @var \Prophecy\Prophecy\ObjectProphecy
++ */
++protected $messenger;
++
++  /**
++   * The form object.
++   *
++   * @var \Drupal\flysystem\Form\FlysystemAdapterConfigForm
++   */
++  protected $form;
++
++  /**
++   * {@inheritdoc}
++   */
++  public function setUp(): void {
++    parent::setUp();
++
++    $container = new ContainerBuilder();
++
++    $this->subAdapterPluginManager = $this->prophesize(FlysystemAdapterPluginManager::class);
++    $container->set('plugin.manager.flysystem_adapter', $this->subAdapterPluginManager->reveal());
++
++    $this->messenger = $this->prophesize(MessengerInterface::class);
++    $container->set('flysystem_factory', $this->messenger->reveal());
++
++    \Drupal::setContainer($container);
++    $this->form = new FlysystemAdapterConfigForm(
++      $this->subAdapterPluginManager->reveal(),
++      $this->messenger->reveal()
++    );
++
++  }
++
++  /**
++   * @covers ::create
++   * @covers ::__construct
++   */
++  public function testCreate() {
++    $container = new ContainerBuilder();
++    $container->set('plugin.manager.flysystem_adapter', $this->subAdapterPluginManager->reveal());
++    $container->set('messenger', $this->messenger->reveal());
++
++    $this->assertInstanceOf(FlysystemAdapterConfigForm::class, FlysystemAdapterConfigForm::create($container));
++  }
++
++  /**
++   * @covers ::getFormId
++   */
++  public function testGetFormId() {
++    // Need to set expected return value in ::setUp
++    //$this->assertSame('flysystem_config_form', $this->form->getFormId());
++  }
++
++  /**
++   * @covers ::form
++   * @covers ::buildEntityConfigForm
++   * @covers ::buildSubAdapterConfigForm
++   */
++  public function testForm() {
++    $form = $this->form->form([], new FormState());
++    $this->assertCount(2, $form);
++    // Need to flesh this test out, this is currently a stub.
++    //$this->assertTrue($form['label']['#required']);
++    //$this->assertTrue($form['sub_adapter']['#required']);
++  }
++
++  /**
++   * @covers ::save
++   */
++  public function testSave() {
++    $form_state = new FormState();
++    $form = $this->form->form([], $form_state);
++
++    $this->form->validateForm($form, $form_state);
++    $this->assertCount(0, $form_state->getErrors());
++
++  }
++
++}

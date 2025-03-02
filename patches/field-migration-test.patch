@@ -1,0 +1,175 @@
+diff --git a/tests/src/Unit/Form/FieldMigrationTest.php b/tests/src/Unit/Form/FieldMigrationTest.php
+new file mode 100644
+index 0000000..e6d3419
+--- /dev/null
++++ b/tests/src/Unit/Form/FieldMigrationTest.php
+@@ -0,0 +1,169 @@
++<?php
++
++namespace Drupal\Tests\flysystem\Unit\Form;
++
++use Drupal\Core\Entity\EntityTypeManagerInterface;
++use Drupal\Core\Entity\EntityFieldManagerInterface;
++use Drupal\Core\Field\FieldTypePluginManagerInterface;
++use Drupal\Core\StreamWrapper\StreamWrapperManagerInterface;
++use Drupal\Core\Form\FormState;
++use Drupal\flysystem\FlysystemFactory;
++use Drupal\flysystem\Form\FieldMigration;
++use Drupal\Tests\UnitTestCase;
++use League\Flysystem\Filesystem;
++use League\Flysystem\InMemory\InMemoryFilesystemAdapter as MemoryAdapter;
++use Symfony\Component\DependencyInjection\ContainerBuilder;
++
++/**
++ * @coversDefaultClass \Drupal\flysystem\Form\FieldMigration
++ * @group flysystem
++ */
++class FieldMigrationTest extends UnitTestCase {
++
++  /**
++   * The Flysystem factory prophecy.
++   *
++   * @var \Prophecy\Prophecy\ObjectProphecy
++   */
++  protected $factory;
++
++  /**
++   * The EntityType Manager prophecy.
++   *
++   * @var \Prophecy\Prophecy\ObjectProphecy
++   */
++  protected $entityTypeManager;
++
++  /**
++   * Field Manager prophecy.
++   *
++   * @var \Prophecy\Prophecy\ObjectProphecy
++   */
++  protected $fieldManager;
++
++  /**
++   * Field Type Manager prophecy
++   *
++   * @var \Prophecy\Prophecy\ObjectProphecy
++   */
++  protected $fieldTypeManager;
++
++  /**
++   * Stream Wrapper Manager prophecy.
++   *
++   * @var \Prophecy\Prophecy\ObjectProphecy
++   */
++  protected $streamWrapperManager;
++
++  /**
++   * The form object.
++   *
++   * @var \Drupal\flysystem\Form\FieldMigration
++   */
++  protected $form;
++
++  /**
++   * {@inheritdoc}
++   */
++  public function setUp(): void {
++    parent::setUp();
++
++    $container = new ContainerBuilder();
++
++    $this->factory = $this->prophesize(FlysystemFactory::class);
++    $this->factory->getFilesystem('from_source')->willReturn(new Filesystem(new MemoryAdapter()));
++    $this->factory->getFilesystem('to_target')->willReturn(new Filesystem(new MemoryAdapter()));
++    $this->factory->getSchemes()->willReturn(['from_source', 'to_target']);
++    $container->set('flysystem_factory', $this->factory->reveal());
++
++    $this->entityTypeManager = $this->prophesize(EntityTypeManagerInterface::class);
++    $container->set('entity_type.manager', $this->entityTypeManager->reveal());
++
++    $this->fieldManager = $this->prophesize(EntityFieldManagerInterface::class);
++    $container->set('entity_field.manager',$this->fieldManager->reveal());
++
++    $this->fieldTypeManager = $this->prophesize(FieldTypePluginManagerInterface::class);
++    $container->set('plugin.manager.field.field_type', $this->fieldTypeManager->reveal());
++
++    $this->streamWrapperManager = $this->prophesize(StreamWrapperManagerInterface::class);
++    $container->set('stream_wrapper_manager', $this->streamWrapperManager->reveal());
++
++    $container->set('string_translation', $this->getStringTranslationStub());
++    \Drupal::setContainer($container);
++
++    $this->form = new FieldMigration(
++      $this->factory->reveal(),
++      $this->entityTypeManager->reveal(),
++      $this->fieldManager->reveal(),
++      $this->fieldTypeManager->reveal(),
++      $this->streamWrapperManager->reveal()
++    );
++  }
++
++  /**
++   * @covers ::create
++   * @covers ::__construct
++   */
++  public function testCreate() {
++    $container = new ContainerBuilder();
++    $container->set('flysystem_factory', $this->factory->reveal());
++    $container->set('entity_type.manager', $this->entityTypeManager->reveal());
++    $container->set('entity_field.manager',$this->fieldManager->reveal());
++    $container->set('plugin.manager.field.field_type', $this->fieldTypeManager->reveal());
++    $container->set('stream_wrapper_manager', $this->streamWrapperManager->reveal());
++
++    $this->assertInstanceOf(FieldMigration::class, FieldMigration::create($container));
++  }
++
++  /**
++   * @covers ::getFormId
++   */
++  public function testGetFormId() {
++    $this->assertSame('flysystem_field_migration', $this->form->getFormId());
++  }
++
++  /**
++   * @covers ::buildForm
++   * @covers ::getEntityTypeOptions
++   * @covers ::getFieldOptions
++   * @covers ::getFileFields
++   */
++  public function testBuildForm() {
++    $form = $this->form->buildForm([], new FormState());
++
++    $this->assertCount(5, $form);
++    $this->assertTrue($form['entity_type']['#required']);
++  }
++
++  /**
++   * @covers ::validateForm
++   */
++  public function testValidateForm() {
++    $form_state = new FormState();
++    $form = $this->form->buildForm([], $form_state);
++
++    // Insert code to fill in form field values here.
++
++    $this->form->validateForm($form, $form_state);
++    $this->assertCount(0, $form_state->getErrors());
++
++    // Add additional assertions here.
++  }
++
++  /**
++   * @covers ::submitForm
++   * @covers ::updateFieldSettings
++   * @covers ::migrateFieldStorage
++   */
++  public function testSubmitForm() {
++    $form_state = new FormState();
++    $form = [];
++
++    // Insert code to populate form values here.
++
++    // When code to populate form values is added, uncomment the following line.
++    // $this->form->submitForm($form, $form_state);
++
++    // Add assertions here.
++  }
++}
