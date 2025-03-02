@@ -121,6 +121,8 @@
                 "Fixing php 8.2 compatibility issues with php-compatibility-sniffer":"patches/php-compatibility-sniffer-8.1-patch.patch"
             },
             "drupal/flysystem": {
+                "Issue #3507867: Add Tests for FieldMigration": "patches/field-migration-test.patch",
+                "Issue <TBD>: Add Tests for FlysystemAdapterConfigForm": "patches/flysystem-adapter-config-form-test.patch"
             }
         },
         "drupal-lenient": {
