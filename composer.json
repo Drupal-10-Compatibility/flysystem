@@ -127,7 +127,7 @@
                 "Fixing php 8.2 compatibility issues with php-compatibility-sniffer":"patches/php-compatibility-sniffer-8.1-patch.patch"
             },
             "drupal/flysystem": {
-                "Issue #3504144: serve_js/css BC layer in Drupal 10 is broken in 2.2.0-beta2": "https://www.drupal.org/files/issues/2025-03-10/3504144-add-asset-processors-for-bc.patch"
+                "Issue #3504144: serve_js/css BC layer in Drupal 10 is broken in 2.2.0-beta2": "patches/3504144-add-asset-processors-for-bc.patch"
             },
             "drupal/flysystem_s3": {
                 "S3 Coding standards fixes": "patches/flysystem_s3-coding-standards-fixes.patch"
