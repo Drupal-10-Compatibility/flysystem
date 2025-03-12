@@ -1,0 +1,13 @@
+diff --git a/tests/src/Unit/Flysystem/Adapter/DrupalCacheAdapterTest.php b/tests/src/Unit/Flysystem/Adapter/DrupalCacheAdapterTest.php
+index 3ef2b2f..6c47e8d 100644
+--- a/tests/src/Unit/Flysystem/Adapter/DrupalCacheAdapterTest.php
++++ b/tests/src/Unit/Flysystem/Adapter/DrupalCacheAdapterTest.php
+@@ -174,7 +174,7 @@ class DrupalCacheAdapterTest extends UnitTestCase {
+     $this->assertSame(Visibility::PUBLIC, $fileAttributes->visibility());
+ 
+     // Create new files to move.
+-    $this->cacheAdapter->write('first.txt', 'contents', $config);
++    $this->cacheAdapter->write('first.txt', 'contents', new Config(['visibility' => 'public']));
+     // Check that new file exists.
+     $this->assertFileExists(static::ROOT . '/first.txt');
+     // Check that new file has appropriate permissions.

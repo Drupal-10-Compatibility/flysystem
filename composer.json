@@ -122,7 +122,8 @@
             },
             "drupal/flysystem": {
                 "Issue #3507867: Add Tests for FieldMigration": "patches/field-migration-test.patch",
-                "Issue <TBD>: Add Tests for FlysystemAdapterConfigForm": "patches/flysystem-adapter-config-form-test.patch"
+                "Issue <TBD>: Add Tests for FlysystemAdapterConfigForm": "patches/flysystem-adapter-config-form-test.patch",
+                "Fix DrupalCacheAdapter file permissions on testing": "patches/fix-drupalcacheadaptertest-file-permissions.patch"
             }
         },
         "drupal-lenient": {
