@@ -17,9 +17,9 @@
     "require": {
         "composer/installers": "^1.9",
         "cweagans/composer-patches": "^1.7",
-        "drupal/core": "^10.3",
-        "drupal/core-composer-scaffold": "^10.3",
-        "drupal/core-recommended": "^10.3",
+        "drupal/core": "^11.0",
+        "drupal/core-composer-scaffold": "^11.0",
+        "drupal/core-recommended": "^11.0",
         "drupal/flysystem": "3.0.x-dev",
         "drush/drush": "^13.3",
         "league/flysystem": "^3.1",
@@ -28,7 +28,7 @@
         "wikimedia/composer-merge-plugin": "^2.0"
     },
     "require-dev": {
-        "drupal/core-dev": "^10.3",
+        "drupal/core-dev": "^11.0",
         "league/flysystem-memory": "^3.0",
         "phpcompatibility/php-compatibility": "8.1.0",
         "phpspec/prophecy": "~1.0",
@@ -122,8 +122,7 @@
             },
             "drupal/flysystem": {
                 "Issue #3507867: Add Tests for FieldMigration": "patches/field-migration-test.patch",
-                "Issue <TBD>: Add Tests for FlysystemAdapterConfigForm": "patches/flysystem-adapter-config-form-test.patch",
-                "Fix DrupalCacheAdapter file permissions on testing": "patches/fix-drupalcacheadaptertest-file-permissions.patch"
+                "Issue <TBD>: Add Tests for FlysystemAdapterConfigForm": "patches/flysystem-adapter-config-form-test.patch"
             }
         },
         "drupal-lenient": {

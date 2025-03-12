@@ -1,0 +1,13 @@
+diff --git a/src/ImageStyleCopier.php b/src/ImageStyleCopier.php
+index 34af014..b5b181e 100644
+--- a/src/ImageStyleCopier.php
++++ b/src/ImageStyleCopier.php
+@@ -93,6 +93,8 @@ class ImageStyleCopier implements EventSubscriberInterface {
+ 
+   /**
+    * {@inheritdoc}
++   *
++   * @returns array<string, string|array{0: string, 1: int}|list<array{0: string, 1?: int}>>
+    */
+   public static function getSubscribedEvents() {
+     $events = [];
